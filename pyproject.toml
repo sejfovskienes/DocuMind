@@ -4,4 +4,4 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["fastapi (>=0.121.0,<0.122.0)", "psycopg2-binary (>=2.9.11,<3.0.0)", "python-jose[cryptography] (>=3.5.0,<4.0.0)", "dotenv (>=0.9.9,<0.10.0)", "python-dotenv (>=1.2.1,<2.0.0)"]

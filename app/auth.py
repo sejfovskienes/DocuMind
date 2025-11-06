@@ -2,7 +2,7 @@ import os
 from jose import jwt 
 from typing import Optional
 from dotenv import load_dotenv
-from datetime import timedelta
+from datetime import datetime, timedelta
 from passlib.context import CryptContext
 
 load_dotenv(override=True)
@@ -11,7 +11,7 @@ JWT_SECRET = os.getenv("SECRET_KEY")
 JWT_ALGORITHM = os.getenv("HASHING_ALGORITHM")
 ACCESS_TOKEN_EXPIRES_MINUTES = 60
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
@@ -20,7 +20,7 @@ def get_password_hash(plain_password: str) -> str:
     return pwd_context.hash(plain_password)
 
 def create_access_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:
-    now = timedelta.now()
+    now = datetime.now()
     if expires_delta:
         expire = now + expires_delta
     else: 
@@ -49,3 +49,6 @@ def decode_token(token: str) -> dict:
     except jwt.PyJWTError as e:
         print(f"PyJWT error:\n {e}")
         raise
+
+
+

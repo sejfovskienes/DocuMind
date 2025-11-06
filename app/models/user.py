@@ -1,4 +1,5 @@
 from app.database import Base
+from sqlalchemy.orm import relationship
 from sqlalchemy import Column, Integer, String, DateTime, func
 
 class User(Base):
@@ -9,3 +10,5 @@ class User(Base):
     full_name = Column(String, nullable=False)
     hashed_password = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    documents = relationship("Document", back_populates="user")

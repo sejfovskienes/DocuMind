@@ -1,27 +1,26 @@
-from typing import Generator 
+# from typing import Generator 
 from datetime import timedelta
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 
-from app import models
-from app import schemas, crud
-from app.database import SessionLocal
-# from app.schemas.user import TokenData
+from app.models import user
+from app import schemas, crud, database
+# from app.database import SessionLocal
 from app.auth import create_access_token, decode_token
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-def get_db() -> Generator:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# def get_db() -> Generator:
+#     db = SessionLocal()
+#     try:
+#         yield db
+#     finally:
+#         db.close()
 
 @router.post("/register", response_model=schemas.user.UserOut, status_code=status.HTTP_201_CREATED)
-def register(user_in: schemas.user.UserCreate, db: Session = Depends(get_db)):
+def register(user_in: schemas.user.UserCreate, db: Session = Depends(database.get_db)):
     existing = crud.get_user_by_email(db, user_in.email)
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -29,7 +28,7 @@ def register(user_in: schemas.user.UserCreate, db: Session = Depends(get_db)):
     return user
 
 @router.post("/token", response_model=schemas.user.Token)
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_db)):
     user = crud.authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -42,7 +41,7 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
     access_token = create_access_token(subject=user.email, expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> models.user.User:
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_db)) -> user.User:
     from jwt import ExpiredSignatureError, PyJWTError
     try:
         payload = decode_token(token)
@@ -60,5 +59,5 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     return user
 
 @router.get("/users/me", response_model=schemas.user.UserOut)
-def read_user_me(current_user: models.user.User = Depends(get_current_user)):
+def read_user_me(current_user: user.User = Depends(get_current_user)):
     return current_user

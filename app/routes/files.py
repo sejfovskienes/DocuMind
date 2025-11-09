@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from app import database, crud
 from app.models import user
 from .auth import get_current_user
+from app.services import file_service
 
 load_dotenv(override=True)
 
@@ -31,7 +32,7 @@ async def upload_file(
 
     return {"message": "File uploaded successfully", "file_id": document.id}
 
-@router.get("/get-file-{id}")
+@router.get("/get-file/{id}")
 def get_document_by_id(
     id: int,
     current_user: user.User = Depends(get_current_user),
@@ -42,7 +43,7 @@ def get_document_by_id(
     else:
         raise HTTPException(status_code=404, detail=f"File with id: {id} not found!")
 
-@router.get("/delete-file-{id}")
+@router.get("/delete-file/{id}")
 def delete_file(
     id: int,
     db: Session = Depends(database.get_db),
@@ -52,3 +53,16 @@ def delete_file(
         return {"message": f"Document with id: {id} has been deleted successfully!"}
     else:
         return {"message": f"Error occured while deleting document with id: {id}!"}
+
+@router.get("get-file-content/{id}")
+def get_file_content(
+    id: int, 
+    db: Session = Depends(database.get_db), 
+    current_user : user.User = Depends(get_current_user)):
+
+    file = crud.get_document_by_id(db, id)
+    if file:
+        content = file_service.read_file(file.file_path)
+        return {"file content": str(content)}
+    else:
+        return {"message": f"An error occured while reading file with id: {id}"}

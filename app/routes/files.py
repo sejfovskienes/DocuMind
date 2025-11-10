@@ -70,15 +70,15 @@ def process_file(
     else:
         return {"message": f"File with id:{id} not found"}
 
-@router.get("/get-file-content/{id}")
-def get_file_content(
-    id: int, 
-    db: Session = Depends(database.get_db), 
-    current_user : user.User = Depends(get_current_user)):
+# @router.get("/get-file-metadata/{id}")
+# def get_file_content(
+#     id: int, 
+#     db: Session = Depends(database.get_db), 
+#     current_user : user.User = Depends(get_current_user)):
 
-    file = crud.get_document_by_id(db, id)
-    if file:
-        content = file_service.extract_text_from_pdf(file.file_path)
-        return {"file content": str(content)}
-    else:
-        return {"message": f"An error occured while reading file with id: {id}!"}
+#     file = crud.get_document_by_id(db, id)
+#     if file:
+#         content = file_service.extract_text_from_pdf(file.file_path)
+#         return {"file content": str(content)}
+#     else:
+#         return {"message": f"An error occured while reading file with id: {id}!"}

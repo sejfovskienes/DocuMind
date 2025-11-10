@@ -10,6 +10,8 @@ QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 COLLECTION = os.getenv("QDRANT_COLLECTION_NAME")
 VECTOR_SIZE = 100
 
+#--- TODO: implement logic for mapping the collections 1:1 with user.
+
 def get_qdrant_client() -> QdrantClient:
     qdrant_client = QdrantClient(
         url=QDRANT_URL, 

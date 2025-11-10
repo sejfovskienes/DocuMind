@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 from sqlalchemy.orm import Session 
 
 from app import models
@@ -21,6 +22,11 @@ def delete_document_by_id(db: Session, id: int) -> bool:
         db.delete(doc)
         db.commit()
         return True
+def get_document_metadata_by_id(db: Session, document_id: int):
+    document_metadata = db.query(ProcessedFileMetadata).filter(ProcessedFileMetadata.document_id == document_id).first()
+    if not document_metadata:
+        raise HTTPException(status_code=404, detail=f"Metadata for document:{document_id} not found!")
+    return document_metadata
 
 def create_user(db: Session, user_in: user_schema.UserCreate):
     hashed = get_password_hash(user_in.password)

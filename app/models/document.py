@@ -13,3 +13,7 @@ class Document(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
 
     user = relationship("User", back_populates="documents")
+    processed_document_metadata = relationship("ProcessedFileMetadata", 
+                                               back_populates="document", 
+                                               uselist=False, 
+                                               cascade="all, delete-orphan")

@@ -7,12 +7,17 @@ from app.schemas import user as user_schema
 from app.auth import get_password_hash, verify_password
 from app.models.processed_document import ProcessedFileMetadata
 
-#--- TODO: rework the methods to throw errors  
 def get_user_by_email(db: Session, email: str) :
-    return db.query(models.user.User).filter(models.user.User.email == email).first()
+    user = db.query(models.user.User).filter(models.user.User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User with email:{email} not found!")
+    return user 
 
 def get_document_by_id(db: Session, id: int):
-    return db.query(Document).filter(Document.id == id).first()
+    document =  db.query(Document).filter(Document.id == id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail=f"Document with id:{id} not found!")
+    return document
 
 def delete_document_by_id(db: Session, id: int) -> bool:
     doc = get_document_by_id(db, id)
@@ -22,8 +27,10 @@ def delete_document_by_id(db: Session, id: int) -> bool:
         db.delete(doc)
         db.commit()
         return True
+    
 def get_document_metadata_by_id(db: Session, document_id: int):
-    document_metadata = db.query(ProcessedFileMetadata).filter(ProcessedFileMetadata.document_id == document_id).first()
+    document_metadata = db.query(ProcessedFileMetadata) \
+    .filter(ProcessedFileMetadata.document_id == document_id).first()
     if not document_metadata:
         raise HTTPException(status_code=404, detail=f"Metadata for document:{document_id} not found!")
     return document_metadata

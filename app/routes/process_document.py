@@ -6,7 +6,7 @@ from app.database import get_db
 from app.routes.auth import get_current_user
 from app.crud import get_document_metadata_by_id
 
-router = APIRouter(prefix="/process", tags=["document-metadata"])
+router = APIRouter(prefix="/processed", tags=["document-metadata"])
 
 @router.get("/get-document-metadata/{id}")
 def get_document_metadata(

@@ -4,7 +4,7 @@ import unicodedata
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.crud import save_metadata_object
+from app.services import processed_doc_service
 from app.models.processed_document import ProcessedFileMetadata
 
 def extract_text_from_pdf(file_path: str) -> str:
@@ -24,7 +24,7 @@ def clean_raw_text(text: str) -> str:
     return text
 
 def make_metadata_object(db: Session, document_id: int , raw_text: str) -> ProcessedFileMetadata:
-    document_metadata = save_metadata_object(db, document_id, raw_text)
+    document_metadata = processed_doc_service.save_metadata_object(db, document_id, raw_text)
     if not document_metadata:
         raise HTTPException(status_code=500, detail="An error occured while saving the metadata object!")
     return document_metadata

@@ -10,7 +10,13 @@ QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 COLLECTION = os.getenv("QDRANT_COLLECTION_NAME")
 VECTOR_SIZE = 100
 
-#--- TODO: implement logic for mapping the collections 1:1 with user.
+"""
+    TODO:
+    implement logic for mapping the collections 1:1 with user, by changing the collection name to id of the user.
+    it can be made using payload for each vector where data isolation can be provided between different users.
+    but this approach can lead to heavier operations.
+    research for the best approach.
+""" 
 
 def get_qdrant_client() -> QdrantClient:
     qdrant_client = QdrantClient(

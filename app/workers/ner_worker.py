@@ -11,5 +11,5 @@ class NERWorker:
     def extract_entities(document_metadata: ProcessedFileMetadata, text: str) -> dict[str, any]:
         #--- processing by the transformer
         result = {"key": "value"}
-        processed_doc_service.update_metadata_object(document_metadata, result)
+        processed_doc_service.update_document_metadata_object(document_metadata, result)
         pass 

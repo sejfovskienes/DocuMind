@@ -1,10 +1,9 @@
 import re
 import fitz
 import unicodedata
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.crud import save_metadata_object
+from app.services import processed_doc_service
 from app.models.processed_document import ProcessedFileMetadata
 
 def extract_text_from_pdf(file_path: str) -> str:
@@ -12,7 +11,6 @@ def extract_text_from_pdf(file_path: str) -> str:
     with fitz.open(file_path) as pdf:
         for page in pdf:
             text += page.get_text("text")
-    # print(f"PDF file content:\n {text}")
     return text
 
 def clean_raw_text(text: str) -> str:
@@ -23,15 +21,9 @@ def clean_raw_text(text: str) -> str:
     text = text.strip()
     return text
 
-def make_metadata_object(db: Session, document_id: int , raw_text: str) -> ProcessedFileMetadata:
-    document_metadata = save_metadata_object(db, document_id, raw_text)
-    if not document_metadata:
-        raise HTTPException(status_code=500, detail="An error occured while saving the metadata object!")
-    return document_metadata
-
-def preprocess_file_pipeline(db: Session, document_id: int,  file_path: str):
+def preprocess_file_pipeline(db: Session, document_id: int,  file_path: str) -> ProcessedFileMetadata:
     text = extract_text_from_pdf(file_path=file_path)
     clean_text = clean_raw_text(text)
-    metadata_object = make_metadata_object(db, document_id, clean_text)
+    metadata_object = processed_doc_service.save_document_metadata_object(db, document_id, clean_text)
     
     return metadata_object

@@ -4,7 +4,6 @@ from app.models.user import User
 from app.schemas.user import UserCreate
 from app.auth import get_password_hash, verify_password
 
-
 def create_user(db: Session, user_in: UserCreate):
     hashed = get_password_hash(user_in.password)
     db_user = User(email=user_in.email, hashed_password=hashed, full_name=user_in.full_name)

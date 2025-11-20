@@ -12,5 +12,8 @@ wheels/
 # Environment files
 .env
 
-#Document storage 
+# Document storage 
 files
+
+# NER model
+app/core/onnx

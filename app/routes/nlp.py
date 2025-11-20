@@ -1,25 +1,17 @@
 from sqlalchemy.orm import Session
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
-from app import crud
 from app.database import get_db
 from app.models.user import User
 from app.routes.auth import get_current_user
-# from app.services.ner_service import extract_entities
+from app.services import  processed_doc_service
 
 router = APIRouter(prefix="/nlp", tags=["NLP"])
 
-@router.post("/ner/{id}")
+@router.post("/ner/{document_id}")
 def run_ner(
-    id: int, 
+    document_id: int, 
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)):
-    document = crud.get_document_by_id(db, id)
-    if not document:
-        raise HTTPException(status_code=404, detail=f"Document with id:{id}, not found!")
-    document_metadata = crud.get_document_metadata_by_id(id)
-    if not document_metadata:
-        raise HTTPException(status_code=400, detail=f"Document with id:{id}, is not processed yet!")
-    # entities = extract_entities(document_metadata.clean_text)
-    entities = "asd"
+    entities = processed_doc_service.get_named_entities(db, document_id)
     return {"entities": entities}

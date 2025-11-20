@@ -8,8 +8,7 @@ from app.auth import get_password_hash, verify_password
 from app.models.processed_document import ProcessedFileMetadata
 
 #--- TODO: rework the methods to throw errors  
-def get_user_by_email(db: Session, email: str) :
-    return db.query(models.user.User).filter(models.user.User.email == email).first()
+
 
 
 
@@ -19,21 +18,9 @@ def get_document_metadata_by_id(db: Session, document_id: int):
         raise HTTPException(status_code=404, detail=f"Metadata for document:{document_id} not found!")
     return document_metadata
 
-def create_user(db: Session, user_in: user_schema.UserCreate):
-    hashed = get_password_hash(user_in.password)
-    db_user = models.user.User(email=user_in.email, hashed_password=hashed, full_name=user_in.full_name)
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
 
-def authenticate_user(db: Session, username: str, password: str):
-    user = get_user_by_email(db, username)
-    if not user:
-        return None
-    if not verify_password(password, user.hashed_password):
-        return None
-    return user
+
+
 
 
 

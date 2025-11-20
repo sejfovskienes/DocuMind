@@ -5,31 +5,24 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 
 from app.models import user
-from app import schemas, crud, database
-# from app.database import SessionLocal
+from app import schemas, database
+from app.services import user_service
 from app.auth import create_access_token, decode_token
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# def get_db() -> Generator:
-#     db = SessionLocal()
-#     try:
-#         yield db
-#     finally:
-#         db.close()
-
 @router.post("/register", response_model=schemas.user.UserOut, status_code=status.HTTP_201_CREATED)
 def register(user_in: schemas.user.UserCreate, db: Session = Depends(database.get_db)):
-    existing = crud.get_user_by_email(db, user_in.email)
+    existing = user_service.get_user_by_email(db, user_in.email)
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
-    user = crud.create_user(db, user_in)
+    user = user_service.create_user(db, user_in)
     return user
 
 @router.post("/token", response_model=schemas.user.Token)
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_db)):
-    user = crud.authenticate_user(db, form_data.username, form_data.password)
+    user = user_service.authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -53,7 +46,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     except PyJWTError as e:
         raise HTTPException(status_code=401, detail=f"Could not validate credentials: {e}")
     
-    user = crud.get_user_by_email(db, email)
+    user = user_service.get_user_by_email(db, email)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return user

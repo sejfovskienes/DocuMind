@@ -1,7 +1,7 @@
 from art import *
 from fastapi import FastAPI
 
-from app.routes import auth, files, process_document, nlp
+from app.routes import auth, document, process_document, nlp
 from app.database import Base, engine
 
 
@@ -18,6 +18,6 @@ def main():
 Base.metadata.create_all(bind=engine)
 
 app.include_router(auth.router)
-app.include_router(files.router)
+app.include_router(document.router)
 app.include_router(process_document.router)
 app.include_router(nlp.router)

@@ -11,7 +11,7 @@ from app.services import file_service, document_service
 
 load_dotenv(override=True)
 
-router = APIRouter(prefix="/files", tags=["files"])
+router = APIRouter(prefix="/documents", tags=["Documents"])
 
 UPLOAD_DIR = os.getenv("UPLOAD_DIR")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -19,7 +19,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @router.post("/upsert-file")
 async def upload_file(
     file: UploadFile = File(...),
-    db: Session = Depends(database.get_db), 
+    db: Session = Depends(database.get_database_session), 
     current_user: user.User = Depends(get_current_user)):
     unique_name = f"{uuid4()}_{file.filename}"
     file_path = os.path.join(UPLOAD_DIR, unique_name)
@@ -33,21 +33,21 @@ async def upload_file(
     else:
         return {"message": "An error occured while uploading the file!"}
     
-@router.get("/get-file/{id}")
+@router.get("/get-document/{document-id}")
 def get_document_by_id(
     id: int,
     current_user: user.User = Depends(get_current_user),
-    db: Session = Depends(database.get_db)):
+    db: Session = Depends(database.get_database_session)):
     file = document_service.get_document_by_id(db, id)
     if file:
         return {f"file:{id} object": file}
     else:
         raise HTTPException(status_code=404, detail=f"File with id: {id} not found!")
 
-@router.get("/delete-file/{id}")
+@router.get("/delete-document/{document-id}")
 def delete_file(
     id: int,
-    db: Session = Depends(database.get_db),
+    db: Session = Depends(database.get_database_session),
     current_user: user.User = Depends(get_current_user)):
     success = document_service.delete_document_by_id(db, id)
     if success:
@@ -55,10 +55,10 @@ def delete_file(
     else:
         return {"message": f"Error occured while deleting document with id: {id}!"}
     
-@router.get("/process-file/{id}")
+@router.get("/process-document/{document-id}")
 def process_file(
     id: int, 
-    db: Session = Depends(database.get_db), 
+    db: Session = Depends(database.get_database_session), 
     current_user: user.User = Depends(get_current_user)):
     file = document_service.get_document_by_id(db, id)
     if file:

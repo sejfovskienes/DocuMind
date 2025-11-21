@@ -13,7 +13,7 @@ router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 @router.post("/register", response_model=schemas.user.UserOut, status_code=status.HTTP_201_CREATED)
-def register(user_in: schemas.user.UserCreate, db: Session = Depends(database.get_db)):
+def register(user_in: schemas.user.UserCreate, db: Session = Depends(database.get_database_session)):
     existing = user_service.get_user_by_email(db, user_in.email)
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -21,7 +21,7 @@ def register(user_in: schemas.user.UserCreate, db: Session = Depends(database.ge
     return user
 
 @router.post("/token", response_model=schemas.user.Token)
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_db)):
+def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(database.get_database_session)):
     user = user_service.authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -34,7 +34,7 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
     access_token = create_access_token(subject=user.email, expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_db)) -> user.User:
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(database.get_database_session)) -> user.User:
     from jwt import ExpiredSignatureError, PyJWTError
     try:
         payload = decode_token(token)

@@ -13,7 +13,8 @@ class Document(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
 
     user = relationship("User", back_populates="documents")
-    processed_document_metadata = relationship("ProcessedDocumentMetadata", 
+    processed_document_metadata = relationship("DocumentMetadata", 
                                                back_populates="document", 
                                                uselist=False, 
                                                cascade="all, delete-orphan")
+    chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")

@@ -6,7 +6,7 @@ from datetime import datetime
 from transformers import AutoTokenizer
 
 # from app.services import processed_doc_service
-# from app.models.processed_document import ProcessedDocumentMetadata
+# from app.models.processed_document import DocumentMetadata
 
 def singleton(cls):
     instances = {}

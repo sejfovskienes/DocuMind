@@ -20,4 +20,4 @@ class DocumentMetadata(Base):
         "Document", 
         back_populates="processed_document_metadata"
     )
-    chunks = relationship("DocumentChunk", back_populates="metadata", cascade="all, delete-orphan")
+    chunks = relationship("DocumentChunk", back_populates="document_metadata", cascade="all, delete-orphan")

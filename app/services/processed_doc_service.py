@@ -16,13 +16,11 @@ def get_document_metadata_by_document_id(
 
 def save_document_metadata_object(
         db: Session, 
-        document_id: int, 
-        raw_text: str):
-    metadata_object = DocumentMetadata(document_id=document_id, clean_text=raw_text)
-    db.add(metadata_object)
+        document_metadata: DocumentMetadata):
+    db.add(document_metadata)
     db.commit()
-    db.refresh(metadata_object)
-    return metadata_object
+    db.refresh(document_metadata)
+    return document_metadata
 
 def update_document_metadata(
         db: Session,

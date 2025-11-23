@@ -13,7 +13,7 @@ wheels/
 .env
 
 # Document storage 
-files
+documents/*
 
 # NER model
 app/core/onnx

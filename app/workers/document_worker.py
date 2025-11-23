@@ -2,13 +2,16 @@ import re
 import fitz
 import unicodedata
 from sqlalchemy.orm import Session
+from sentence_transformers import SentenceTransformer
 
 from app.models import document, document_chunk
 
 #--- TODO: in v1.1 add OCR and table data analysis.
 
+EMBEDDING_MODEL = SentenceTransformer("all-mpnet-base-v2")
+
 class DocumentWorker:
-    def __init__(self, document: document.Document, max_tokens: int = 500, overlap: int = 500):
+    def __init__(self, document: document.Document, max_tokens: int = 200, overlap: int = 150):
         self.document_path = document.file_path
         self.document_id = document.id
         self.document_metadata_id = document.processed_document_metadata.id
@@ -17,8 +20,7 @@ class DocumentWorker:
         self.embedding_model = None
     
     def __enter__(self):
-        from sentence_transformers import SentenceTransformer
-        self.embedding_model = SentenceTransformer("all-mpnet-base-v2")
+        self.embedding_model = EMBEDDING_MODEL
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
@@ -57,8 +59,8 @@ class DocumentWorker:
             chunks.append(chunk_text)
 
             start = end-self.overlap
-            if start < 0: 
-                start = 0
+            if self.overlap >= self.max_tokens: 
+                raise ValueError("Overlap must be smaller than max_tokens")
         return chunks 
     
     def convert_to_embeddings(self, chunk_text: str) -> list[float]:
@@ -67,7 +69,7 @@ class DocumentWorker:
     
     def to_document_chunk_object(self, chunks: list[str]) -> list[document_chunk.DocumentChunk]:
         document_chunk_objects = []
-        for chunk_text, i in enumerate(chunks):
+        for i, chunk_text in enumerate(chunks):
             chunk = document_chunk.DocumentChunk(
                 document_id=self.document_id, 
                 metadata_id=self.document_metadata_id, 
@@ -90,10 +92,10 @@ class DocumentWorker:
             print(f"An error occured while saving the document chunk objects:\n{e}")
             return False
         
-    def document_processing_pipeline(self) -> bool:
+    def document_processing_pipeline(self, db: Session) -> bool:
         text = self.extract_text_from_pdf()
         clean_text = self.clean_raw_text(text)
         chunks = self.chunkify_clean_text(clean_text)
         chunk_objects = self.to_document_chunk_object(chunks)
-        result = self.save_document_chunk_object(chunk_objects)
-        return self.document_id, chunk_objects, len(chunk_objects), result 
+        save_chunks_result = self.save_document_chunk_object(db, chunk_objects)
+        return chunk_objects, len(chunk_objects), save_chunks_result 

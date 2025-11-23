@@ -27,11 +27,21 @@ def update_document_metadata(
         document_id: int,
         new_data: dict[str: any]):
     document_metadata = get_document_metadata_by_document_id(db, document_id)
+    if not document_metadata:
+        raise ValueError(f"Document metadata for object with id: {id}, not found")
+    for key, value in new_data.items():
+            if hasattr(document_metadata, key):
+                setattr(document_metadata, key, value)
+            else:
+                raise AttributeError(f"Metadata object has no attribute {key} to set")
     try:
-        for key, value in new_data.items():
-            setattr(document_metadata, key, value)
+        db.add(document_metadata)
+        db.commit()
+        db.refresh(document_metadata)
+        return document_metadata
     except Exception as e:
-        print(f"Error occured while updating the document metadata object:\n{e}")
+        db.rollback()
+        raise RuntimeError(f"Error occured while updating the document metadata object:\n{e}")
 
 def get_named_entities(db: Session, document_id: int):
     document_metadata = get_document_metadata_by_document_id(db, document_id)

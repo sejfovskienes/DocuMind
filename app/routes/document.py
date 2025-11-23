@@ -8,7 +8,8 @@ from fastapi import (
 from app import database
 from app.models import user
 from .auth import get_current_user
-from app.services import  document_service
+from app.services import document_service
+from app.schemas.document_chunk_schema import DocumentChunkSchema
 
 load_dotenv(override=True)
 
@@ -28,12 +29,18 @@ async def upload_file(
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
     
-    document = document_service.create_document(db, current_user.id, filename=file.filename, file_path=file_path)
+    document = document_service.create_document(
+        db, 
+        current_user.id, 
+        filename=file.filename, file_path=file_path)
     if document:
-        worker_result, chunks, dm_result, dmo = document_service.process_document(db, document)
-        return {"message": "File uploaded successfully", "file_id": document.id,
-                "document_worker_result": worker_result, "chunks": chunks,
-                "document_metadata_saved": "dmo"}
+        save_chunks_result, chunk_objects, document_metadata_saved = document_service.process_document(db, document)
+        return {"message": "Document uploaded successfully", 
+                "document_id": document.id,
+                "document_object": document, 
+                "save_chunks_result": save_chunks_result, 
+                "chunks": [DocumentChunkSchema.model_validate(chunk) for chunk in chunk_objects],
+                "document_metadata_saved": document_metadata_saved}
     else:
         return {"message": "An error occured while uploading the file!"}
     
@@ -55,9 +62,11 @@ def delete_file(
     current_user: user.User = Depends(get_current_user)):
     success = document_service.delete_document_by_id(db, id)
     if success:
-        return {"message": f"Document with id: {id} has been deleted successfully!"}
+        return {
+            "message": f"Document with id: {id} has been deleted successfully!"}
     else:
-        return {"message": f"Error occured while deleting document with id: {id}!"}
+        return {
+            "message": f"Error occured while deleting document with id: {id}!"}
     
 # @router.get("/process-document/{document-id}")
 # def process_file(

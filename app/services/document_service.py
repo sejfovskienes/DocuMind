@@ -32,8 +32,8 @@ def process_document(db: Session, document: Document):
     document_metadata = DocumentMetadata(
                 document_id=document.id,
                 status="pending")
-    dm_result = processed_doc_service.save_document_metadata_object(db, document_metadata)
+    document_metadata_saved = processed_doc_service.save_document_metadata_object(db, document_metadata)
     with document_worker.DocumentWorker(document) as worker:
-        chunk_objects, chunk_number, worker_result = worker.document_processing_pipeline()
+        chunk_objects, chunk_number, save_chunks_result = worker.document_processing_pipeline(db)
     processed_doc_service.update_document_metadata(db, document.id, {"status": "ready", "total_chunks":chunk_number})
-    return worker_result, chunk_objects, dm_result, document_metadata
+    return save_chunks_result, chunk_objects, document_metadata_saved

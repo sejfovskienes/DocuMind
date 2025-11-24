@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.workers import document_worker
 from app.models.document import Document
-from app.services import processed_doc_service
+from app.services import document_metadata_service
 from app.models.document_metadata import DocumentMetadata
 
 def create_document(db: Session, user_id: int, filename: str, file_path: str) -> Document:
@@ -32,8 +32,8 @@ def process_document(db: Session, document: Document):
     document_metadata = DocumentMetadata(
                 document_id=document.id,
                 status="pending")
-    document_metadata_saved = processed_doc_service.save_document_metadata_object(db, document_metadata)
+    document_metadata_saved = document_metadata_service.save_document_metadata_object(db, document_metadata)
     with document_worker.DocumentWorker(document) as worker:
         chunk_objects, chunk_number, save_chunks_result = worker.document_processing_pipeline(db)
-    processed_doc_service.update_document_metadata(db, document.id, {"status": "ready", "total_chunks":chunk_number})
+    document_metadata_service.update_document_metadata(db, document.id, {"status": "ready", "total_chunks":chunk_number})
     return save_chunks_result, chunk_objects, document_metadata_saved

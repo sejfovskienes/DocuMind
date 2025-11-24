@@ -6,10 +6,11 @@ from fastapi import (
     APIRouter, UploadFile, File, Depends, HTTPException)
 
 from app import database
-from app.models import user
+from app.models import user, worker_task
 from .auth import get_current_user
-from app.services import document_service
+from app.services import document_service, worker_task_service
 from app.schemas.document_chunk_schema import DocumentChunkSchema
+from app.core.enum import worker_task_type
 
 load_dotenv(override=True)
 
@@ -33,14 +34,24 @@ async def upload_file(
         db, 
         current_user.id, 
         filename=file.filename, file_path=file_path)
+    
+    document_processing_task = worker_task.WorkerTask(
+        payload={"document_id": document.id},
+        task_type="document_processing")
+    worker_task_service.save_worker_task(db, document_processing_task)
     if document:
-        save_chunks_result, chunk_objects, document_metadata_saved = document_service.process_document(db, document)
-        return {"message": "Document uploaded successfully", 
-                "document_id": document.id,
-                "document_object": document, 
-                "save_chunks_result": save_chunks_result, 
-                "chunks": [DocumentChunkSchema.model_validate(chunk) for chunk in chunk_objects],
-                "document_metadata_saved": document_metadata_saved}
+        # save_chunks_result, chunk_objects, document_metadata_saved = document_service.process_document(db, document)
+        # return {"message": "Document uploaded successfully", 
+        #         "document_id": document.id,
+        #         "document_object": document, 
+        #         "save_chunks_result": save_chunks_result, 
+        #         "chunks": [DocumentChunkSchema.model_validate(chunk) for chunk in chunk_objects],
+        #         "document_metadata_saved": document_metadata_saved}
+        return{
+            "message": "Document uploaded successfully",
+            "document": document,
+            "worker_task": document_processing_task
+        }
     else:
         return {"message": "An error occured while uploading the file!"}
     

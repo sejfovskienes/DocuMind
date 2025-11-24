@@ -1,7 +1,8 @@
-from app.database import Base
 from datetime import datetime
 from sqlalchemy.orm import relationship
 from sqlalchemy import Column, Integer, ForeignKey, String, JSON, DateTime, Text
+
+from app.database import Base
 
 class DocumentMetadata(Base):
     __tablename__ = "processed_documents"

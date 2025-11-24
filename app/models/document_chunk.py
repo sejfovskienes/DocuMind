@@ -1,6 +1,7 @@
-from app.database import Base
 from sqlalchemy.orm import relationship
 from sqlalchemy import Column, Integer, ForeignKey, JSON, Text
+
+from app.database import Base
 
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"

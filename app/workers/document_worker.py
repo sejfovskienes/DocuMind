@@ -1,3 +1,4 @@
+import os
 import re
 import fitz
 import unicodedata
@@ -91,11 +92,24 @@ class DocumentWorker:
         except Exception as e:
             print(f"An error occured while saving the document chunk objects:\n{e}")
             return False
-        
+    
+    def delete_document_from_local_storage(db: Session, document: document.Document):
+        if not document:
+            raise ValueError(f"Document with id: {document.id} not found")
+        try: 
+            os.remove(document.file_path)
+            setattr(document, "file_path", None)
+            db.add(document)
+            db.commit()
+        except Exception as e:
+            raise RuntimeError("An error occured while deleting document from local storage.")
+            print(f"Error message: {e}")
+
     def document_processing_pipeline(self, db: Session) -> bool:
         text = self.extract_text_from_pdf()
         clean_text = self.clean_raw_text(text)
         chunks = self.chunkify_clean_text(clean_text)
         chunk_objects = self.to_document_chunk_object(chunks)
         save_chunks_result = self.save_document_chunk_object(db, chunk_objects)
+        self.delete_document_from_local_storage(db, document)
         return chunk_objects, len(chunk_objects), save_chunks_result 

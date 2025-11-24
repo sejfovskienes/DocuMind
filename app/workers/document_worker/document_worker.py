@@ -4,23 +4,34 @@ import fitz
 import unicodedata
 from time import sleep
 from pathlib import Path
+from functools import wraps
 from sqlalchemy.orm import Session
 from sentence_transformers import SentenceTransformer
 
-from app.services import worker_task_service, document_service
-from app.database import get_database_session
+from app.database import get_session
 from app.models import document, document_chunk
+from app.services import worker_task_service, document_service
 
 EMBEDDING_MODEL = SentenceTransformer("all-mpnet-base-v2")
 
+def singleton(cls):
+    instances = {}
+
+    @wraps(cls)
+    def get_instance(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+            return instances[cls]
+    return get_instance
+
+@singleton
 class DocumentWorker:
     def __init__(self, max_tokens: int = 200, overlap: int = 150):
         self.max_tokens = max_tokens
         self.overlap = overlap
-        self.embedding_model = None
+        self.embedding_model = EMBEDDING_MODEL
     
     def __enter__(self):
-        self.embedding_model = EMBEDDING_MODEL
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
@@ -28,7 +39,7 @@ class DocumentWorker:
     
     def extract_document_content(self, document_file_path: str | Path) -> str:
         content = ""
-        with fitz.open(self.document_path) as pdf:
+        with fitz.open(document_file_path) as pdf:
             for page in pdf:
                 content += page.get_text("text")
         return content
@@ -40,6 +51,12 @@ class DocumentWorker:
         text = re.sub(r'\s{2,}', ' ', text)
         text = text.strip()
         return text
+    
+    def tokenize(self, text: str) -> list[str]:
+        return text.split()
+    
+    def detokenize(self, tokens: list[str]):
+        return " ".join(tokens)
     
     def chunkify_clean_text(self, clean_text: str) -> list[str]:
         tokens = self.tokenize(clean_text)
@@ -61,12 +78,14 @@ class DocumentWorker:
         embeddings = self.embedding_model.encode(chunk_text)
         return embeddings.tolist()
     
-    def to_document_chunk_object(self, chunks: list[str]) -> list[document_chunk.DocumentChunk]:
+    def to_document_chunk_object(
+            self,
+            chunks: list[str]) -> list[document_chunk.DocumentChunk]:
         document_chunk_objects = []
         for i, chunk_text in enumerate(chunks):
             chunk = document_chunk.DocumentChunk(
                 document_id=self.document_id, 
-                metadata_id=self.document_metadata_id, 
+                # metadata_id=self.document_metadata_id, 
                 index = i,
                 text=chunk_text,
                 tokens=len(chunk_text.split()),
@@ -86,7 +105,7 @@ class DocumentWorker:
             print(f"An error occured while saving the document chunk objects:\n{e}")
             return False
         
-    def delete_document_from_local_storage(db: Session, document: document.Document):
+    def delete_document_from_local_storage(self, db: Session, document: document.Document):
         if not document:
             raise ValueError(f"Document with id: {document.id} not found")
         try: 
@@ -99,6 +118,7 @@ class DocumentWorker:
             print(f"Error message: {e}")
 
     def process_document(self, db: Session, document: document.Document) -> None:
+        self.document_id = document.id
         document_content = self.extract_document_content(document.file_path)
         clean_text = self.clean_document_content(document_content)
         document_chunks = self.chunkify_clean_text(clean_text)
@@ -111,7 +131,7 @@ class DocumentWorker:
     def worker_loop(self):
         print("Worker started and waiting for tasks...")
         while True:
-            db = get_database_session()
+            db = get_session()
             worker_task = worker_task_service.get_new_task(db)
 
             if not worker_task:
@@ -122,9 +142,10 @@ class DocumentWorker:
 
             try:
                 print(f"Processing task with id: {worker_task.id}, with type: {worker_task.task_type}")
-                worker_task_service.update_worker_task(db, worker_task, {"status": "Processing"})
-                document = document_service.get_document_by_id(worker_task.payload.get_children["document_id"])
+                worker_task_service.update_worker_task(db, worker_task, {"status": "processing"})
+                document = document_service.get_document_by_id(db, worker_task.payload["document_id"])
                 result = self.process_document(db, document)
                 print(f"Processing task for document with id:{document.id} is finished: {result}")
             except Exception as e:
+                worker_task_service.update_worker_task(db, worker_task, {"status": "queued"})
                 print(f"An error occured while processing the task: {e}")

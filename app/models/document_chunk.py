@@ -8,7 +8,7 @@ class DocumentChunk(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     document_id = Column(Integer, ForeignKey("documents.id"))
-    metadata_id = Column(Integer, ForeignKey("processed_documents.id"))
+    # metadata_id = Column(Integer, ForeignKey("processed_documents.id"))
     index = Column(Integer, nullable=False)
     text = Column(Text, nullable=False)
     tokens = Column(Integer, nullable=False)
@@ -17,4 +17,3 @@ class DocumentChunk(Base):
     topic_keywords = Column(JSON, nullable=True)
 
     document = relationship("Document", back_populates="chunks")
-    document_metadata = relationship("DocumentMetadata", back_populates="chunks")

@@ -9,7 +9,7 @@ class WorkerTask(Base):
     id = Column(Integer, primary_key=True, index=True)
     payload = Column(JSON) 
     task_type = Column(String, nullable=False)
-    status = Column(String, insert_default="Queued")
+    status = Column(String, insert_default="queued")
     started_at = Column(DateTime, insert_default=datetime.utcnow())
     finshed_at = Column(DateTime, nullable=True)
 

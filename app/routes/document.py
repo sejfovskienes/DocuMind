@@ -6,11 +6,11 @@ from fastapi import (
     APIRouter, UploadFile, File, Depends, HTTPException)
 
 from app import database
-from app.models import user, worker_task
 from .auth import get_current_user
+from app.models import user, worker_task
 from app.services import document_service, worker_task_service
-from app.schemas.document_chunk_schema import DocumentChunkSchema
-from app.core.enum import worker_task_type
+# from app.schemas.document_chunk_schema import DocumentChunkSchema
+# from app.core.enum import worker_task_type
 
 load_dotenv(override=True)
 

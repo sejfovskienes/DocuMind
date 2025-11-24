@@ -9,7 +9,7 @@ class Document(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String, nullable=False)
-    file_path = Column(String, nullable=False)
+    file_path = Column(String, nullable=True)
     uploaded_at = Column(DateTime(timezone=True), default=datetime.utcnow)
     user_id = Column(Integer, ForeignKey("users.id"))
 

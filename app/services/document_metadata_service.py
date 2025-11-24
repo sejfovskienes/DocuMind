@@ -2,7 +2,7 @@ import os
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.workers.ner_worker import NERWorker
+from app.workers.ner_worker.ner_worker import NERWorker
 from app.models.document_metadata import DocumentMetadata
 
 def get_document_metadata_by_document_id(

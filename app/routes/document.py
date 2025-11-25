@@ -23,12 +23,10 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 async def upload_file(
     file: UploadFile = File(...),
     db: Session = Depends(database.get_database_session), 
-    current_user: user.User = Depends(get_current_user)):
+    current_user: user.User = Depends(get_current_user)) -> dict[str, any]:
     unique_name = f"{uuid4()}_{file.filename}"
     file_path = os.path.join(UPLOAD_DIR, unique_name)
-
-    with open(file_path, "wb") as buffer:
-        buffer.write(await file.read())
+    document_service.write_document_locally(file, file_path) 
     
     document = document_service.create_document(
         db, 

@@ -1,10 +1,23 @@
+import google.auth
 from fastapi import HTTPException
 from sqlalchemy.orm import Session 
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaFileUpload
 
 from app.workers import document_worker
 from app.models.document import Document
 from app.services import document_metadata_service
 from app.models.document_metadata import DocumentMetadata
+
+async def write_document_locally(file, file_path: str) -> None:
+    try:
+        with open(file_path, "wb") as buffer:
+            buffer.write(await file.read())
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"An error occured while writing the file locally: {e}")
 
 def create_document(db: Session, user_id: int, filename: str, file_path: str) -> Document:
     doc = Document(user_id=user_id, filename=filename, file_path=file_path)

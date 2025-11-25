@@ -49,3 +49,14 @@ def get_new_task(db: Session) -> WorkerTask | None:
     if not worker_task:
         return None
     return worker_task
+
+def get_worker_task_by_id(
+        db: Session, 
+        worker_task_id: int) -> WorkerTask | None:
+    worker_task = db.query(WorkerTask) \
+    .filter(WorkerTask.id == worker_task_id).first()
+    if not worker_task:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Worker task with id: {id} not found!")
+    return worker_task

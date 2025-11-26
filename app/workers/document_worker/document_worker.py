@@ -10,7 +10,7 @@ from sentence_transformers import SentenceTransformer
 
 from app.database import get_session
 from app.models import document, document_chunk
-from app.services import worker_task_service, document_service
+from app.services import task_service, document_service
 
 EMBEDDING_MODEL = SentenceTransformer("all-mpnet-base-v2")
 
@@ -36,6 +36,9 @@ class DocumentWorker:
     
     def __exit__(self, exc_type, exc_value, traceback):
         del self.embedding_model
+    
+    def document_worker_print(self, text: str) -> None: 
+        print("\033[92m {}\033[00m".format(text))
     
     def extract_document_content(self, document_file_path: str | Path) -> str:
         content = ""
@@ -129,23 +132,24 @@ class DocumentWorker:
         return save_document_chunks
     
     def worker_loop(self):
-        print("Worker started and waiting for tasks...")
+        self.document_worker_print("Document worker started and waiting for tasks...")
         while True:
             db = get_session()
-            worker_task = worker_task_service.get_new_task(db)
+            worker_task = task_service.get_new_task(db, task_type="document_processing")
 
             if not worker_task:
                 db.close()
-                print("No tasks, worker going to sleep mode.")
+                self.document_worker_print("No tasks, worker going to sleep mode.")
                 sleep(1)
                 continue
 
             try:
-                print(f"Processing task with id: {worker_task.id}, with type: {worker_task.task_type}")
-                worker_task_service.update_worker_task(db, worker_task, {"status": "processing"})
+                self.document_worker_print(
+                    f"Processing task with id: {worker_task.id}, with type: {worker_task.task_type}")
+                task_service.update_worker_task(db, worker_task, {"status": "processing"})
                 document = document_service.get_document_by_id(db, worker_task.payload["document_id"])
                 result = self.process_document(db, document)
-                print(f"Processing task for document with id:{document.id} is finished: {result}")
+                self.document_worker_print(f"Processing task for document with id:{document.id} is finished: {result}")
             except Exception as e:
-                worker_task_service.update_worker_task(db, worker_task, {"status": "queued"})
-                print(f"An error occured while processing the task: {e}")
+                task_service.update_worker_task(db, worker_task, {"status": "queued"})
+                self.document_worker_print(f"An error occured while processing the task: {e}")

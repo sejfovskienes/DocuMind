@@ -1,5 +1,6 @@
 import os 
 from uuid import uuid4
+from typing import Any
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from fastapi import (
@@ -8,7 +9,7 @@ from fastapi import (
 from app import database
 from .auth import get_current_user
 from app.models import user, worker_task
-from app.services import document_service, worker_task_service
+from app.services import document_service, task_service
 # from app.schemas.document_chunk_schema import DocumentChunkSchema
 # from app.core.enum import worker_task_type
 
@@ -23,20 +24,22 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 async def upload_file(
     file: UploadFile = File(...),
     db: Session = Depends(database.get_database_session), 
-    current_user: user.User = Depends(get_current_user)) -> dict[str, any]:
+    current_user: user.User = Depends(get_current_user)):
     unique_name = f"{uuid4()}_{file.filename}"
     file_path = os.path.join(UPLOAD_DIR, unique_name)
-    document_service.write_document_locally(file, file_path) 
-    
+
+    with open(file_path, "wb") as buffer:
+        buffer.write(await file.read())
+
     document = document_service.create_document(
         db, 
         current_user.id, 
         filename=file.filename, file_path=file_path)
-    
+
     document_processing_task = worker_task.WorkerTask(
         payload={"document_id": document.id},
         task_type="document_processing")
-    worker_task_service.save_worker_task(db, document_processing_task)
+    task_service.save_worker_task(db, document_processing_task)
     if document:
         # save_chunks_result, chunk_objects, document_metadata_saved = document_service.process_document(db, document)
         # return {"message": "Document uploaded successfully", 

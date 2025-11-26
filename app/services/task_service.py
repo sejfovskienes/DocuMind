@@ -41,9 +41,9 @@ def update_worker_task(
             status_code=500, 
             detail=f"An error occured while updating the task object: {e}")
     
-def get_new_task(db: Session) -> WorkerTask | None:
+def get_new_task(db: Session, task_type: str) -> WorkerTask | None:
     worker_task = db.query(WorkerTask) \
-    .filter(WorkerTask.task_type=="document_processing") \
+    .filter(WorkerTask.task_type==task_type) \
     .filter(WorkerTask.status=="queued").first()
 
     if not worker_task:
@@ -52,11 +52,12 @@ def get_new_task(db: Session) -> WorkerTask | None:
 
 def get_worker_task_by_id(
         db: Session, 
-        worker_task_id: int) -> WorkerTask | None:
+        document_worker_task_id: int) -> WorkerTask | None:
     worker_task = db.query(WorkerTask) \
-    .filter(WorkerTask.id == worker_task_id).first()
+    .filter(WorkerTask.id == document_worker_task_id).first()
     if not worker_task:
         raise HTTPException(
             status_code=404, 
             detail=f"Worker task with id: {id} not found!")
     return worker_task
+

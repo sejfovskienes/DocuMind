@@ -5,6 +5,7 @@ import unicodedata
 from time import sleep
 from pathlib import Path
 from functools import wraps
+from datetime import datetime
 from sqlalchemy.orm import Session
 from sentence_transformers import SentenceTransformer
 
@@ -40,7 +41,9 @@ class DocumentWorker:
     def document_worker_print(self, text: str) -> None: 
         print("\033[92m {}\033[00m".format(text))
     
-    def extract_document_content(self, document_file_path: str | Path) -> str:
+    def extract_document_content(
+            self, 
+            document_file_path: str | Path) -> str:
         content = ""
         with fitz.open(document_file_path) as pdf:
             for page in pdf:
@@ -77,7 +80,9 @@ class DocumentWorker:
                 raise ValueError("Overlap must be smaller than max_tokens")
         return chunks 
     
-    def convert_to_embeddings(self, chunk_text: str) -> list[float]:
+    def convert_to_embeddings(
+            self, 
+            chunk_text: str) -> list[float]:
         embeddings = self.embedding_model.encode(chunk_text)
         return embeddings.tolist()
     
@@ -108,7 +113,10 @@ class DocumentWorker:
             print(f"An error occured while saving the document chunk objects:\n{e}")
             return False
         
-    def delete_document_from_local_storage(self, db: Session, document: document.Document):
+    def delete_document_from_local_storage(
+            self, 
+            db: Session, 
+            document: document.Document):
         if not document:
             raise ValueError(f"Document with id: {document.id} not found")
         try: 
@@ -117,8 +125,7 @@ class DocumentWorker:
             db.add(document)
             db.commit()
         except Exception as e:
-            raise RuntimeError("An error occured while deleting document from local storage.")
-            print(f"Error message: {e}")
+            raise RuntimeError(f"An error occured while deleting document from local storage.\nError message: {e}")
 
     def process_document(self, db: Session, document: document.Document) -> None:
         self.document_id = document.id
@@ -128,7 +135,6 @@ class DocumentWorker:
         chunk_objects = self.to_document_chunk_object(document_chunks)
 
         save_document_chunks = self.save_document_chunk_object(db, chunk_objects) #--- returns bool for the writing to database
-        self.delete_document_from_local_storage(db, document)
         return save_document_chunks
     
     def worker_loop(self):
@@ -142,14 +148,19 @@ class DocumentWorker:
                 self.document_worker_print("No tasks, worker going to sleep mode.")
                 sleep(1)
                 continue
-
             try:
                 self.document_worker_print(
-                    f"Processing task with id: {worker_task.id}, with type: {worker_task.task_type}")
+                    f"\tProcessing task with id: {worker_task.id}, with type: {worker_task.task_type}")
                 task_service.update_worker_task(db, worker_task, {"status": "processing"})
                 document = document_service.get_document_by_id(db, worker_task.payload["document_id"])
                 result = self.process_document(db, document)
-                self.document_worker_print(f"Processing task for document with id:{document.id} is finished: {result}")
+                task_service.update_worker_task(db, worker_task, {"status": "finished", "finshed_at": datetime.utcnow()})
+                self.document_worker_print(f"\tProcessing task for document with id:{document.id} is finished: {result}")
             except Exception as e:
-                task_service.update_worker_task(db, worker_task, {"status": "queued"})
+                task_service.update_worker_task(
+                    db, 
+                    worker_task, 
+                    {"status": "queued"})
                 self.document_worker_print(f"An error occured while processing the task: {e}")
+            finally:
+                self.delete_document_from_local_storage(db, document)

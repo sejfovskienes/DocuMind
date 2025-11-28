@@ -39,7 +39,7 @@ class DocumentWorker:
         del self.embedding_model
     
     def document_worker_print(self, text: str) -> None: 
-        print("\033[92m {}\033[00m".format(text))
+        print("\033[92m {}\033[00m".format("[DocumentWorker]" + f"\t{text}"))
     
     def extract_document_content(
             self, 
@@ -160,7 +160,7 @@ class DocumentWorker:
                 task_service.update_worker_task(
                     db, 
                     worker_task, 
-                    {"status": "queued"})
+                    {"status": "failed"})
                 self.document_worker_print(f"An error occured while processing the task: {e}")
             finally:
                 self.delete_document_from_local_storage(db, document)

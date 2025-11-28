@@ -1,17 +1,17 @@
-import numpy as np
-from time import sleep
-from pathlib import Path
-import onnxruntime as ort
+import sys
 from functools import wraps
-# from datetime import datetime
+from pathlib import Path
+from time import sleep
+
+import numpy as np
+import onnxruntime as ort
+from sqlalchemy.orm import Session
 from transformers import AutoTokenizer
 
-# from app.services import processed_doc_service
-# from app.models.processed_document import DocumentMetadata
 from app.database import get_session
-from app.models.worker_task import WorkerTask
 from app.models.document_chunk import DocumentChunk
-from app.services import task_service, document_chunk_service
+from app.models.worker_task import WorkerTask
+from app.services import document_chunk_service, task_service
 
 def singleton(cls):
     instances = {}
@@ -58,47 +58,70 @@ class NERWorker:
     
     def extract_entities(self, chunk: DocumentChunk):
         processing_text = chunk.text
-        print("Converting to tokens...")
         inputs = self.tokenizer(processing_text, return_tensors="np")
-        print("Running model...")
         outputs = self.model_session.run(None, {
-            "input_ids": inputs["input_ids"], 
-            "attention_mask": inputs["attention_mask"]})
+            "input_ids": inputs["input_ids"],
+            "attention_mask": inputs["attention_mask"],
+        })
         logits = outputs[0]
         pred_ids = np.argmax(logits, axis=-1)[0]
+        print("Unique predicted IDs:", set(pred_ids))
+        print(f"Outputs shape:\n{outputs[0].shape}")
         tokens = self.tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
+
+        SPECIAL_TOKENS = {"<s>", "</s>", "<pad>"}
         entities = []
+        current_word = ""
+        current_label = "O"
         for token, pred_id in zip(tokens, pred_ids):
             label = self.label_map.get(pred_id, "O")
-            if label != "O":
-                entities.append({"token": token, "label": label})
+            if token in SPECIAL_TOKENS:
+                continue
+            if token.startswith("▁"):
+                if current_word and current_label != "O":
+                    entities.append(
+                        {"word": current_word, 
+                         "label": current_label})
+                current_word = token[1:]  #--- remove ▁
+                current_label = label
+            else:
+                current_word += token
+                if label != "O":
+                    current_label = label
+        if current_word and current_label != "O":
+            entities.append({"word": current_word, "label": current_label})
         return entities
-    
-    def ner_processing(self, ner_task: WorkerTask) -> None:
+
+    def ner_processing(self, 
+                       db: Session, 
+                       ner_task: WorkerTask) -> None:
         document_id = int(ner_task.payload["document_id"])
-        document_chunks = document_chunk_service.get_chunks_by_document_id(document_id)
+        document_chunks = document_chunk_service.get_chunks_by_document_id(db, document_id)
         entities = []
         for chunk in document_chunks:
             entities = self.extract_entities(chunk)
-            print(f"ENTITIES FROM CHUNK WITH ID: {chunk.id}:\n{entities}\n\n")
+            print(f"ENTITIES FROM CHUNK WITH ID: {chunk.id}:\n{entities}\n")
         
     def ner_worker_loop(self) -> None:
         self.ner_worker_print("NER worker started and waiting for tasks...")
         db = get_session()
-        while True:
-            ner_task = task_service.get_new_task(db, task_type="ner_task")
-            if not ner_task:
-                db.close()
-                self.ner_worker_print("No tasks, worker going to sleep mode.")
-                sleep(1)
-                continue
-            self.ner_processing(ner_task)
-
-            try:
-                task_service.update_worker_task(db, ner_task, {"status": "processing"})
-                self.extract_named_entities_by_chunk()
-            except Exception as e:
-                task_service.update_worker_task(db, ner_task, {"status": "failed"})
-                self.ner_worker_print(
-                    f"An error occured while processing task with id:{id}, error message:{e}")
-
+        try: 
+            while True:
+                ner_task = task_service.get_new_task(db, task_type="ner_task")
+                if not ner_task:
+                    db.close()
+                    self.ner_worker_print("No tasks, worker going to sleep mode...")
+                    sleep(1)
+                    continue
+                # self.ner_processing(ner_task)
+                try:
+                    task_service.update_worker_task(db, ner_task, {"status": "processing"})
+                    self.ner_processing(db, ner_task)
+                except Exception as e:
+                    task_service.update_worker_task(db, ner_task, {"status": "failed"})
+                    self.ner_worker_print(
+                        f"An error occured while processing task with id:{id}, error message:{e}")
+        except KeyboardInterrupt:
+            self.ner_worker_print("Worker stopped.\n\n")
+            self.ner_worker_print("="*55)
+            sys.exit(0)

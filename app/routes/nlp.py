@@ -15,5 +15,5 @@ def run_ner(
     db: Session = Depends(get_database_session), 
     current_user: User = Depends(get_current_user)):
     ner_task = WorkerTask(payload={"document_id": document_id}, task_type="ner_task")
-    task_service.save_worker_task(ner_task)
+    task_service.save_worker_task(db, ner_task)
     return {"NER task": ner_task}

@@ -9,6 +9,8 @@ from functools import wraps
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+
 
 from app.database import get_session
 from app.models import document, document_chunk
@@ -180,7 +182,7 @@ class DocumentWorker:
                         f"\tProcessing task for document with id:{document.id} is finished: {result}")
                     self.delete_document_from_local_storage(db, document)
         except KeyboardInterrupt:
-            self.ner_worker_print("Worker stopped.\n\n")
-            self.ner_worker_print("="*55)
+            self.document_worker_print("Worker stopped.\n\n")
+            self.document_worker_print("="*55)
             sys.exit(0)
         

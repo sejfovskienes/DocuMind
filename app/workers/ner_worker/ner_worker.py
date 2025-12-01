@@ -1,12 +1,15 @@
 import sys
+import json
 import numpy as np
 from time import sleep
 from pathlib import Path
 import onnxruntime as ort
 from functools import wraps
 from datetime import datetime 
+from transformers import pipeline
 from sqlalchemy.orm import Session
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForTokenClassification
+
 
 from app.database import get_session
 from app.models.worker_task import WorkerTask
@@ -27,6 +30,10 @@ def singleton(cls):
 @singleton
 class NERWorker:
     def __init__(self, model_path: str | Path):
+        tokenizer = AutoTokenizer.from_pretrained("dslim/bert-base-NER")
+        model = AutoModelForTokenClassification.from_pretrained("dslim/bert-base-NER")
+
+        self.nlp = pipeline("ner", model=model, tokenizer=tokenizer)
         self.model_session = ort.InferenceSession(model_path)
         self.tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-base")
         self.label_map = {0: "O", 1: "PER", 2: "ORG", 3: "LOC", 4: "MISC"} 
@@ -57,41 +64,10 @@ class NERWorker:
     def convert_ids_to_tokens(self, pred_ids, inputs):
         return self.tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
     
-    def extract_entities(self, chunk: DocumentChunk):
+    def extract_entities(self, chunk: DocumentChunk) -> dict[str, any]:
         processing_text = chunk.text
-        inputs = self.tokenizer(processing_text, return_tensors="np")
-        outputs = self.model_session.run(None, {
-            "input_ids": inputs["input_ids"],
-            "attention_mask": inputs["attention_mask"],
-        })
-        logits = outputs[0]
-        pred_ids = np.argmax(logits, axis=-1)[0]
-        print("Unique predicted IDs:", set(pred_ids))
-        print(f"Outputs shape:\n{outputs[0].shape}")
-        tokens = self.tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
-
-        SPECIAL_TOKENS = {"<s>", "</s>", "<pad>"}
-        entities = []
-        current_word = ""
-        current_label = "O"
-        for token, pred_id in zip(tokens, pred_ids):
-            label = self.label_map.get(pred_id, "O")
-            if token in SPECIAL_TOKENS:
-                continue
-            if token.startswith("▁"):
-                if current_word and current_label != "O":
-                    entities.append(
-                        {"word": current_word, 
-                         "label": current_label})
-                current_word = token[1:]  #--- remove ▁
-                current_label = label
-            else:
-                current_word += token
-                if label != "O":
-                    current_label = label
-        if current_word and current_label != "O":
-            entities.append({"word": current_word, "label": current_label})
-        return entities
+        result = self.nlp(processing_text)
+        return result
 
     def ner_processing(self, 
                        db: Session, 
@@ -102,6 +78,7 @@ class NERWorker:
         for chunk in document_chunks:
             entities = self.extract_entities(chunk)
             print(f"ENTITIES FROM CHUNK WITH ID: {chunk.id}:\n{entities}\n")
+            document_chunk_service.update_document_chunk(db, chunk, {"ner_entities": json.dumps(str(entities))})
         
     def ner_worker_loop(self) -> None:
         self.ner_worker_print("NER worker started and waiting for tasks...")

@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models.worker_task import WorkerTask
+from app.core.enum.worker_task_status import WorkerTaskStatus
 
 def save_worker_task(
         db: Session, 
@@ -44,7 +45,7 @@ def update_worker_task(
 def get_new_task(db: Session, task_type: str) -> WorkerTask | None:
     worker_task = db.query(WorkerTask) \
     .filter(WorkerTask.task_type==task_type) \
-    .filter(WorkerTask.status=="queued").first()
+    .filter(WorkerTask.status==WorkerTaskStatus.QUEUED).first()
 
     if not worker_task:
         return None

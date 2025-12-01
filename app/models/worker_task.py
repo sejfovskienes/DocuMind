@@ -2,6 +2,7 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, JSON
 
 from app.database import Base
+from app.core.enum.worker_task_status import WorkerTaskStatus
 
 class WorkerTask(Base):
     __tablename__="worker_tasks"
@@ -9,7 +10,7 @@ class WorkerTask(Base):
     id = Column(Integer, primary_key=True, index=True)
     payload = Column(JSON) 
     task_type = Column(String, nullable=False)
-    status = Column(String, insert_default="queued")
+    status = Column(String, insert_default=WorkerTaskStatus.QUEUED)
     started_at = Column(DateTime, insert_default=datetime.utcnow())
     finshed_at = Column(DateTime, nullable=True)
 

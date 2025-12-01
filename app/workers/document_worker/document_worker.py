@@ -1,5 +1,6 @@
 import os 
 import re
+import sys
 import fitz
 import unicodedata
 from time import sleep
@@ -12,6 +13,7 @@ from sentence_transformers import SentenceTransformer
 from app.database import get_session
 from app.models import document, document_chunk
 from app.services import task_service, document_service
+from app.core.enum import worker_task_type, worker_task_status
 
 EMBEDDING_MODEL = SentenceTransformer("all-mpnet-base-v2")
 
@@ -27,7 +29,7 @@ def singleton(cls):
 
 @singleton
 class DocumentWorker:
-    def __init__(self, max_tokens: int = 200, overlap: int = 150):
+    def __init__(self, max_tokens: int = 100, overlap: int = 90):
         self.max_tokens = max_tokens
         self.overlap = overlap
         self.embedding_model = EMBEDDING_MODEL
@@ -127,7 +129,10 @@ class DocumentWorker:
         except Exception as e:
             raise RuntimeError(f"An error occured while deleting document from local storage.\nError message: {e}")
 
-    def process_document(self, db: Session, document: document.Document) -> None:
+    def process_document(
+            self, 
+            db: Session, 
+            document: document.Document) -> None:
         self.document_id = document.id
         document_content = self.extract_document_content(document.file_path)
         clean_text = self.clean_document_content(document_content)
@@ -139,28 +144,43 @@ class DocumentWorker:
     
     def worker_loop(self):
         self.document_worker_print("Document worker started and waiting for tasks...")
-        while True:
-            db = get_session()
-            worker_task = task_service.get_new_task(db, task_type="document_processing")
-
-            if not worker_task:
-                db.close()
-                self.document_worker_print("No tasks, worker going to sleep mode.")
-                sleep(1)
-                continue
-            try:
-                self.document_worker_print(
-                    f"\tProcessing task with id: {worker_task.id}, with type: {worker_task.task_type}")
-                task_service.update_worker_task(db, worker_task, {"status": "processing"})
-                document = document_service.get_document_by_id(db, worker_task.payload["document_id"])
-                result = self.process_document(db, document)
-                task_service.update_worker_task(db, worker_task, {"status": "finished", "finshed_at": datetime.utcnow()})
-                self.document_worker_print(f"\tProcessing task for document with id:{document.id} is finished: {result}")
-            except Exception as e:
-                task_service.update_worker_task(
-                    db, 
-                    worker_task, 
-                    {"status": "failed"})
-                self.document_worker_print(f"An error occured while processing the task: {e}")
-            finally:
-                self.delete_document_from_local_storage(db, document)
+        db = get_session()
+        try: 
+            while True:
+                worker_task = task_service.get_new_task(
+                    db, task_type=worker_task_type.WorkerTaskType.DOCUMENT_PROCESSING)
+                if not worker_task:
+                    db.close()
+                    self.document_worker_print("No tasks, worker going to sleep mode.")
+                    sleep(1)
+                    continue
+                try:
+                    self.document_worker_print(
+                        f"\tProcessing task with id: {worker_task.id}, with type: {worker_task.task_type}")
+                    task_service.update_worker_task(
+                        db, 
+                        worker_task, 
+                        {"status": worker_task_status.WorkerTaskStatus.PROCESSING})
+                    document = document_service.get_document_by_id(db, worker_task.payload["document_id"])
+                    result = self.process_document(db, document)
+                    
+                except Exception as e:
+                    task_service.update_worker_task(
+                        db, 
+                        worker_task, 
+                        {"status": worker_task_status.WorkerTaskStatus.FAILED})
+                    self.document_worker_print(f"An error occured while processing the task: {e}")
+                finally:
+                    task_service.update_worker_task(
+                        db, 
+                        worker_task, 
+                        {"status": worker_task_status.WorkerTaskStatus.FINISHED,
+                        "finshed_at": datetime.utcnow()})
+                    self.document_worker_print(
+                        f"\tProcessing task for document with id:{document.id} is finished: {result}")
+                    self.delete_document_from_local_storage(db, document)
+        except KeyboardInterrupt:
+            self.ner_worker_print("Worker stopped.\n\n")
+            self.ner_worker_print("="*55)
+            sys.exit(0)
+        

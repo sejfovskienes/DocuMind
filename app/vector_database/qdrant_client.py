@@ -10,17 +10,26 @@ QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 COLLECTION = os.getenv("QDRANT_COLLECTION_NAME")
 VECTOR_SIZE = 100
 
-#--- TODO: implement logic for mapping the collections 1:1 with user.
-
-def get_qdrant_client() -> QdrantClient:
-    qdrant_client = QdrantClient(
+class DocumindQdrantClient:
+    #--- get not mixing vector spaces, in cost of uploading the vectors with user id in payload
+    def __init__(self, user_id: int):
+        self.qdrant_client = QdrantClient(
         url=QDRANT_URL, 
         api_key=QDRANT_API_KEY,
     )
+        self.user_id = user_id
+        
+    def __enter__(self):
+        self.qdrant_client.recreate_collection(
+            collection_name=COLLECTION,
+            vectors_config=VectorParams(size=VECTOR_SIZE, 
+                                        distance=Distance.COSINE)
+        )
+        return self
+    
+    def __exit__(self, exc_type, exc_value, traceback):
+        pass 
 
-    qdrant_client.recreate_collection(
-        collection_name=COLLECTION,
-        vectors_config=VectorParams(size=VECTOR_SIZE, distance=Distance.COSINE)
-    )
-
-    return qdrant_client
+    def vectors_upsert(self):
+        #--- vectors uploading logic
+        pass

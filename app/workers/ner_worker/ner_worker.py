@@ -1,17 +1,18 @@
 import sys
-from functools import wraps
-from pathlib import Path
-from time import sleep
-
 import numpy as np
+from time import sleep
+from pathlib import Path
 import onnxruntime as ort
+from functools import wraps
+from datetime import datetime 
 from sqlalchemy.orm import Session
 from transformers import AutoTokenizer
 
 from app.database import get_session
-from app.models.document_chunk import DocumentChunk
 from app.models.worker_task import WorkerTask
+from app.models.document_chunk import DocumentChunk
 from app.services import document_chunk_service, task_service
+from app.core.enum import worker_task_status, worker_task_type
 
 def singleton(cls):
     instances = {}
@@ -107,7 +108,9 @@ class NERWorker:
         db = get_session()
         try: 
             while True:
-                ner_task = task_service.get_new_task(db, task_type="ner_task")
+                ner_task = task_service.get_new_task(
+                    db, 
+                    task_type=worker_task_type.WorkerTaskType.ENTITY_EXTRACTION)
                 if not ner_task:
                     db.close()
                     self.ner_worker_print("No tasks, worker going to sleep mode...")
@@ -115,12 +118,24 @@ class NERWorker:
                     continue
                 # self.ner_processing(ner_task)
                 try:
-                    task_service.update_worker_task(db, ner_task, {"status": "processing"})
+                    task_service.update_worker_task(
+                        db, 
+                        ner_task, 
+                        {"status": worker_task_status.WorkerTaskStatus.PROCESSING})
                     self.ner_processing(db, ner_task)
                 except Exception as e:
-                    task_service.update_worker_task(db, ner_task, {"status": "failed"})
+                    task_service.update_worker_task(
+                        db, 
+                        ner_task, 
+                        {"status": worker_task_status.WorkerTaskStatus.FAILED})
                     self.ner_worker_print(
                         f"An error occured while processing task with id:{id}, error message:{e}")
+                finally:
+                    task_service.update_worker_task(
+                        db,
+                        ner_task,
+                        {"status": worker_task_status.WorkerTaskStatus.FINISHED, "finshed_at": datetime.utcnow()}
+                    )
         except KeyboardInterrupt:
             self.ner_worker_print("Worker stopped.\n\n")
             self.ner_worker_print("="*55)

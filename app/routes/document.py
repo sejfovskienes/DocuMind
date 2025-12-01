@@ -1,6 +1,5 @@
 import os 
 from uuid import uuid4
-from typing import Any
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from fastapi import (
@@ -10,8 +9,7 @@ from app import database
 from .auth import get_current_user
 from app.models import user, worker_task
 from app.services import document_service, task_service
-# from app.schemas.document_chunk_schema import DocumentChunkSchema
-# from app.core.enum import worker_task_type
+from app.core.enum.worker_task_type import WorkerTaskType
 
 load_dotenv(override=True)
 
@@ -38,16 +36,9 @@ async def upload_file(
 
     document_processing_task = worker_task.WorkerTask(
         payload={"document_id": document.id},
-        task_type="document_processing")
+        task_type=WorkerTaskType.DOCUMENT_PROCESSING)
     task_service.save_worker_task(db, document_processing_task)
     if document:
-        # save_chunks_result, chunk_objects, document_metadata_saved = document_service.process_document(db, document)
-        # return {"message": "Document uploaded successfully", 
-        #         "document_id": document.id,
-        #         "document_object": document, 
-        #         "save_chunks_result": save_chunks_result, 
-        #         "chunks": [DocumentChunkSchema.model_validate(chunk) for chunk in chunk_objects],
-        #         "document_metadata_saved": document_metadata_saved}
         return{
             "message": "Document uploaded successfully",
             "document": document,
@@ -65,7 +56,9 @@ def get_document_by_id(
     if file:
         return {f"file:{id} object": file}
     else:
-        raise HTTPException(status_code=404, detail=f"File with id: {id} not found!")
+        raise HTTPException(
+            status_code=404, 
+            detail=f"File with id: {id} not found!")
 
 @router.get("/delete-document/{document-id}")
 def delete_file(
@@ -80,17 +73,3 @@ def delete_file(
         return {
             "message": f"Error occured while deleting document with id: {id}!"}
     
-# @router.get("/process-document/{document-id}")
-# def process_file(
-#     id: int, 
-#     db: Session = Depends(database.get_database_session), 
-#     current_user: user.User = Depends(get_current_user)):
-#     file = document_service.get_document_by_id(db, id)
-#     if file:
-#         processed_document_metadata = file_service.document_processing_pipeline(db, id, file.file_path)
-#         if processed_document_metadata:
-#             return {"message": "Document preprocessing done successfully!", "metadata object": processed_document_metadata}
-#         else:
-#             return {"message": f"An error occured while processing the document with id:{id}"}
-#     else:
-#         return {"message": f"File with id:{id} not found"}

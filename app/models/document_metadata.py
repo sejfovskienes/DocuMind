@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, ForeignKey, String, JSON, DateTime, Text
+from sqlalchemy import Column, Integer, ForeignKey, JSON, DateTime, Text
 
 from app.database import Base
 
@@ -14,7 +14,8 @@ class DocumentMetadata(Base):
     topic_summary = Column(Text, nullable=True)
     global_entities = Column(JSON, nullable=True)
     global_topics = Column(JSON, nullable=True)
-    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_updated = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     document = relationship(
         "Document", 

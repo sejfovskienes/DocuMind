@@ -1,5 +1,5 @@
 from enum import Enum
 
-class WorkerTaskType(Enum):
-    DOCUMENT_PROCESSING: 1
-    ENTITY_EXTRACTION: 2
+class WorkerTaskType(str, Enum):
+    DOCUMENT_PROCESSING = "DOCUMENT_PROCESSING"
+    ENTITY_EXTRACTION = "ENTITY_EXTRACTION"

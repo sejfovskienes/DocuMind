@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import VectorParams, Distance
 
+from app.models import document_chunk
+
 load_dotenv(override=True)
 
 QDRANT_URL = os.getenv("QDRANT_URL")
@@ -30,6 +32,14 @@ class DocumindQdrantClient:
     def __exit__(self, exc_type, exc_value, traceback):
         pass 
 
-    def vectors_upsert(self):
-        #--- vectors uploading logic
-        pass
+    def upsert_embedding(
+            self, 
+            document_chunk: document_chunk.DocumentChunk,
+            payload: dict[str: str]) -> None:
+        
+        self.qdrant_client.upsert(
+            collection_name=COLLECTION,
+            points= document_chunk.embeddings.tolist(),
+            payload= payload
+        )
+        

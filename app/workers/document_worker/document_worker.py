@@ -9,13 +9,14 @@ from functools import wraps
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sentence_transformers import SentenceTransformer
-from transformers import AutoTokenizer, AutoModelForTokenClassification
-
 
 from app.database import get_session
 from app.models import document, document_chunk
-from app.services import task_service, document_service
+from app.services import (
+    task_service, document_service, document_chunk_service)
 from app.core.enum import worker_task_type, worker_task_status
+from app.vector_database.qdrant_client import DocumindQdrantClient
+
 
 EMBEDDING_MODEL = SentenceTransformer("all-mpnet-base-v2")
 
@@ -130,6 +131,20 @@ class DocumentWorker:
             db.commit()
         except Exception as e:
             raise RuntimeError(f"An error occured while deleting document from local storage.\nError message: {e}")
+        
+    def upload_embeddings(
+            self,
+            db: Session, 
+            document:document.Document) -> None:
+        user_id = document.user_id
+        payload = {"user_id": user_id}
+        document_chunks = document_chunk_service.get_chunks_by_document_id(document.id)
+        client = DocumindQdrantClient(user_id)
+        try: 
+            for chunk in document_chunks:
+                client.upsert_embedding(document_chunk, payload)
+        except Exception as e:
+            raise RuntimeError(f"An error occured while uploading embeddings!:{e}")
 
     def process_document(
             self, 

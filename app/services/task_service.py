@@ -62,3 +62,14 @@ def get_worker_task_by_id(
             detail=f"Worker task with id: {id} not found!")
     return worker_task
 
+def get_task_by_id(
+        db: Session, 
+        task_id: int) -> WorkerTask | None:
+    worker_task = db.query(WorkerTask).filter(WorkerTask.id == task_id).first()
+    if not worker_task:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No task found with id: {id}"
+        )
+    return worker_task
+

@@ -1,9 +1,11 @@
 import os 
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import VectorParams, Distance
+from qdrant_client.http.models import (
+    VectorParams, Distance, PointStruct
+)
 
-from app.models import document_chunk
+from app.models.document_chunk import DocumentChunk
 
 load_dotenv(override=True)
 
@@ -24,22 +26,45 @@ class DocumindQdrantClient:
     def __enter__(self):
         self.qdrant_client.recreate_collection(
             collection_name=COLLECTION,
-            vectors_config=VectorParams(size=VECTOR_SIZE, 
-                                        distance=Distance.COSINE)
-        )
+            vectors_config=VectorParams(
+                size=VECTOR_SIZE, 
+                distance=Distance.COSINE
+        ))
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
         pass 
-
-    def upsert_embedding(
-            self, 
-            document_chunk: document_chunk.DocumentChunk,
-            payload: dict[str: str]) -> None:
-        
-        self.qdrant_client.upsert(
-            collection_name=COLLECTION,
-            points= document_chunk.embeddings.tolist(),
-            payload= payload
-        )
-        
+    
+    def upsert_embeddings(
+            self,
+            embeddings: list[float],
+            document_chunks: list[DocumentChunk]
+    )-> bool:
+        try: 
+            points = []
+            for embedding, chunk in zip(embeddings, document_chunks):
+                point_id = str(chunk.id)
+                payload = {
+                    "user_id": self.user_id,
+                    "document_id": chunk.document_id,
+                    "chunk_id": chunk.id,
+                    "chunk_index": chunk.index,
+                    "text": chunk.text,
+                }
+                points.append(
+                    PointStruct(
+                        id = point_id,
+                        vector=embedding,
+                        payload=payload
+                    )
+                )
+            
+                self.qdrant_client.upsert(
+                    collection_name=COLLECTION,
+                    points=points
+                )
+            return True
+        except Exception as e: 
+            message = f"An error occured while uploading embeddings:\n{e}"
+            print(message)
+            return False 

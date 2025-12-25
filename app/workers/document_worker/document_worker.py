@@ -13,8 +13,7 @@ from sentence_transformers import SentenceTransformer
 from app.services import (
     task_service, 
     document_service, 
-    document_chunk_service
-    )
+)
 from app.database import get_session
 from app.models import document, document_chunk
 from app.core.enum import worker_task_type, worker_task_status
@@ -155,16 +154,15 @@ class DocumentWorker:
     def upload_embeddings(
             self,
             db: Session, 
-            document:document.Document) -> None:
+            document_chunks:list[document_chunk.DocumentChunk]) -> None:
         user_id = document.user_id
-        payload = {"user_id": user_id}
-        document_chunks = document_chunk_service.get_chunks_by_document_id(document.id)
         client = DocumindQdrantClient(user_id)
+        embeddings = [chunk.embeddings for chunk in document_chunks]
         try: 
-            for chunk in document_chunks:
-                client.upsert_embedding(document_chunk, payload)
+            client.upsert_batch(embeddings, document_chunks)
         except Exception as e:
-            raise RuntimeError(f"An error occured while uploading embeddings!:{e}")
+            message = f"An error occured while uploading embeddings!:{e}"
+            raise RuntimeError(message)
 
     def process_document(
             self, 
@@ -177,6 +175,7 @@ class DocumentWorker:
         chunk_objects = self.to_document_chunk_object(document_chunks)
         #--- returns bool for the writing to database
         save_document_chunks = self.save_document_chunk_object(db, chunk_objects)
+        self.upload_embeddings(db, chunk_objects)
         return save_document_chunks
     
     def worker_loop(self):

@@ -38,9 +38,10 @@ def update_worker_task(
         db.refresh(worker_task)
         return worker_task
     except Exception as e:
+        message = f"An error occured while updating the task object: {e}"
         raise HTTPException(
             status_code=500, 
-            detail=f"An error occured while updating the task object: {e}")
+            detail=message)
     
 def get_new_task(db: Session, task_type: str) -> WorkerTask | None:
     worker_task = db.query(WorkerTask) \
@@ -65,7 +66,8 @@ def get_worker_task_by_id(
 def get_task_by_id(
         db: Session, 
         task_id: int) -> WorkerTask | None:
-    worker_task = db.query(WorkerTask).filter(WorkerTask.id == task_id).first()
+    worker_task = db.query(WorkerTask) \
+    .filter(WorkerTask.id == task_id).first()
     if not worker_task:
         raise HTTPException(
             status_code=404,
@@ -73,3 +75,7 @@ def get_task_by_id(
         )
     return worker_task
 
+def get_finished_tasks(db: Session, task_type: str) -> list[WorkerTask]:
+    return db.query(WorkerTask) \
+    .filter(WorkerTask.task_type == task_type) \
+    .filter(WorkerTask.status == WorkerTaskStatus.FINISHED).all()

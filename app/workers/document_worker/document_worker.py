@@ -10,10 +10,13 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from sentence_transformers import SentenceTransformer
 
+from app.services import (
+    task_service, 
+    document_service, 
+    document_chunk_service
+    )
 from app.database import get_session
 from app.models import document, document_chunk
-from app.services import (
-    task_service, document_service, document_chunk_service)
 from app.core.enum import worker_task_type, worker_task_status
 from app.vector_database.qdrant_client import DocumindQdrantClient
 
@@ -45,6 +48,19 @@ class DocumentWorker:
     
     def document_worker_print(self, text: str) -> None: 
         print("\033[92m {}\033[00m".format("[DocumentWorker]" + f"\t{text}"))
+
+    def delete_finished_doc_proc_tasks(self, db: Session) -> None:
+        finished_doc_proc_tasks = task_service.get_finished_tasks(
+            db, 
+            worker_task_type.WorkerTaskType.DOCUMENT_PROCESSING
+        )
+        if len(finished_doc_proc_tasks) == 0:
+            self.document_worker_print("[info]\tFound 0 tasks for cleaning")
+        db.delete(finished_doc_proc_tasks)
+        db.commit()
+        count_deleted = len(finished_doc_proc_tasks)
+        message = f"[info]\tDeleted: {count_deleted} tasks from database"
+        self.document_worker_print(message)
     
     def extract_document_content(
             self, 
@@ -69,7 +85,9 @@ class DocumentWorker:
     def detokenize(self, tokens: list[str]):
         return " ".join(tokens)
     
-    def chunkify_clean_text(self, clean_text: str) -> list[str]:
+    def chunkify_clean_text(
+            self, 
+            clean_text: str) -> list[str]:
         tokens = self.tokenize(clean_text)
         total_tokens = len(tokens) 
         start = 0
@@ -82,7 +100,8 @@ class DocumentWorker:
 
             start = end-self.overlap
             if self.overlap >= self.max_tokens: 
-                raise ValueError("Overlap must be smaller than max_tokens")
+                message = "Overlap must be smaller than max_tokens"
+                raise ValueError(message)
         return chunks 
     
     def convert_to_embeddings(
@@ -130,7 +149,8 @@ class DocumentWorker:
             db.add(document)
             db.commit()
         except Exception as e:
-            raise RuntimeError(f"An error occured while deleting document from local storage.\nError message: {e}")
+            message = f"An error occured while deleting document from local storage.\nError message: {e}"
+            raise RuntimeError(message)
         
     def upload_embeddings(
             self,
@@ -155,13 +175,15 @@ class DocumentWorker:
         clean_text = self.clean_document_content(document_content)
         document_chunks = self.chunkify_clean_text(clean_text)
         chunk_objects = self.to_document_chunk_object(document_chunks)
-
-        save_document_chunks = self.save_document_chunk_object(db, chunk_objects) #--- returns bool for the writing to database
+        #--- returns bool for the writing to database
+        save_document_chunks = self.save_document_chunk_object(db, chunk_objects)
         return save_document_chunks
     
     def worker_loop(self):
-        self.document_worker_print("Document worker started and waiting for tasks...")
         db = get_session()
+        self.document_worker_print("Document worker started...")
+        self.delete_finished_doc_proc_tasks(db)
+        self.document_worker_print("Waiting for tasks...")
         try: 
             while True:
                 worker_task = task_service.get_new_task(

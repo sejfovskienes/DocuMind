@@ -8,8 +8,10 @@ from functools import wraps
 from datetime import datetime 
 from transformers import pipeline
 from sqlalchemy.orm import Session
-from transformers import AutoTokenizer, AutoModelForTokenClassification
-
+from transformers import (
+    AutoTokenizer, 
+    AutoModelForTokenClassification
+)
 
 from app.database import get_session
 from app.models.worker_task import WorkerTask
@@ -47,6 +49,19 @@ class NERWorker:
 
     def ner_worker_print(self, text: str) -> None:
         print("\033[93m {}\033[00m".format(text))
+
+    def delete_finished_tasks(self, db: Session) -> None: 
+        self.ner_worker_print("[info]\tDeleting finished NER tasks...")
+        finished_ner_tasks = task_service.get_finished_ner_tasks(
+            db, 
+            worker_task_type.WorkerTaskType.ENTITY_EXTRACTION
+        )
+        if len(finished_ner_tasks) == 0:
+            self.ner_worker_print("Found 0 finished tasks.")
+        db.delete(finished_ner_tasks)
+        db.commit()
+        message = f"Deleted {len(finished_ner_tasks)}, finished NER tasks."
+        self.ner_worker_print(message)
     
     def convert_text_to_tokens(self, chunk: DocumentChunk):
         self.ner_worker_print("Converting to tokens...")
@@ -78,11 +93,16 @@ class NERWorker:
         for chunk in document_chunks:
             entities = self.extract_entities(chunk)
             print(f"ENTITIES FROM CHUNK WITH ID: {chunk.id}:\n{entities}\n")
-            document_chunk_service.update_document_chunk(db, chunk, {"ner_entities": json.dumps(str(entities))})
+            document_chunk_service.update_document_chunk(
+                db, 
+                chunk, 
+                {"ner_entities": json.dumps(str(entities))})
         
     def ner_worker_loop(self) -> None:
-        self.ner_worker_print("NER worker started and waiting for tasks...")
         db = get_session()
+        self.ner_worker_print("NER worker started...")
+        self.delete_finished_tasks(db)
+        self.ner_worker_print("Waiting for tasks...")
         try: 
             while True:
                 ner_task = task_service.get_new_task(
@@ -93,7 +113,6 @@ class NERWorker:
                     self.ner_worker_print("No tasks, worker going to sleep mode...")
                     sleep(1)
                     continue
-                # self.ner_processing(ner_task)
                 try:
                     task_service.update_worker_task(
                         db, 
@@ -111,7 +130,8 @@ class NERWorker:
                     task_service.update_worker_task(
                         db,
                         ner_task,
-                        {"status": worker_task_status.WorkerTaskStatus.FINISHED, "finshed_at": datetime.utcnow()}
+                        {"status": worker_task_status.WorkerTaskStatus.FINISHED, 
+                         "finshed_at": datetime.utcnow()}
                     )
         except KeyboardInterrupt:
             self.ner_worker_print("Worker stopped.\n\n")

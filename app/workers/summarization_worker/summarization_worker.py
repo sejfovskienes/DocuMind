@@ -1,3 +1,4 @@
+import time
 from functools import wraps
 from sqlalchemy.orm import Session
 
@@ -42,7 +43,7 @@ class SummarizationWorker:
             db.delete(task)
         db.commit()
         count_deleted = len(finished_summarization_tasks)
-        message = f"\tDeleted: {count_deleted} tasks from database"
+        message = f"\t[info] Deleted: {count_deleted} tasks from database"
         self.summarization_worker_print(message)
 
     def process_summarization_task(
@@ -62,8 +63,10 @@ class SummarizationWorker:
                     db, 
                     task_type=worker_task_type.WorkerTaskType.SUMMARIZATION)
                 if summarization_task is None:
-                    message = "No new summarization tasks found. Entering sleeping mode..."
+                    message = "[info] No new summarization tasks found. Entering sleeping mode..."
                     self.summarization_worker_print(message)
+                    time.sleep(20)
+                    continue
                 else:
                     data = {"status": worker_task_status.WorkerTaskStatus.PROCESSING}
                     task_service.update_worker_task(db, summarization_task, data)
@@ -76,5 +79,5 @@ class SummarizationWorker:
                         task_service.update_worker_task(db, summarization_task, data)
             except Exception as e:
                 id = summarization_task.id if summarization_task else "N/A"
-                message = f"Error occurred in summarization task with id: {id}\n {e}"
-                print(message)
+                message = f"[error] An error occurred in summarization task with id: {id}\n {e}"
+                self.summarization_worker_print(message)

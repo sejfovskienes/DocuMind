@@ -9,8 +9,8 @@ from app import schemas, database
 from app.services import user_service
 from app.auth import create_access_token, decode_token
 
-router = APIRouter()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+router = APIRouter(prefix="/auth", tags=["Auth"])
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 @router.post("/register", 
              response_model=schemas.user.UserOut, 
@@ -26,7 +26,7 @@ def register(
     user = user_service.create_user(db, user_in)
     return user
 
-@router.post("/token", response_model=schemas.user.Token)
+@router.post("/login", response_model=schemas.user.Token)
 def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(), 
     db: Session = Depends(database.get_database_session)):
@@ -73,6 +73,6 @@ def get_current_user(
             detail="User not found")
     return user
 
-@router.get("/users/me", response_model=schemas.user.UserOut)
+@router.get("/my-profile", response_model=schemas.user.UserOut)
 def read_user_me(current_user: user.User = Depends(get_current_user)):
     return current_user

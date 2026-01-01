@@ -58,7 +58,9 @@ class NERWorker:
         )
         if len(finished_ner_tasks) == 0:
             self.ner_worker_print("Found 0 finished tasks.")
-        db.delete(finished_ner_tasks)
+            return
+        for task in finished_ner_tasks:
+            db.delete(task)
         db.commit()
         message = f"Deleted {len(finished_ner_tasks)}, finished NER tasks."
         self.ner_worker_print(message)

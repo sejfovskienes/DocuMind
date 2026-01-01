@@ -15,54 +15,46 @@ COLLECTION = os.getenv("QDRANT_COLLECTION_NAME")
 VECTOR_SIZE = 100
 
 class DocumindQdrantClient:
-    #--- get not mixing vector spaces, in cost of uploading the vectors with user id in payload
     def __init__(self, user_id: int):
+        self.user_id = user_id
         self.qdrant_client = QdrantClient(
         url=QDRANT_URL, 
         api_key=QDRANT_API_KEY,
-    )
-        self.user_id = user_id
-        
-    def __enter__(self):
-        self.qdrant_client.recreate_collection(
-            collection_name=COLLECTION,
-            vectors_config=VectorParams(
-                size=VECTOR_SIZE, 
-                distance=Distance.COSINE
-        ))
-        return self
+        )
+        if COLLECTION not in [c.name for c in self.qdrant_client.get_collections().collections]:
+            self.qdrant_client.create_collection(
+                collection_name=COLLECTION,
+                vectors_config=VectorParams(size=768, distance=Distance.COSINE)
+            )
     
     def __exit__(self, exc_type, exc_value, traceback):
         pass 
     
     def upsert_embeddings(
             self,
-            embeddings: list[float],
-            document_chunks: list[DocumentChunk]
-    )-> bool:
+            embeddings: list[list[float]],
+            document_chunks: list[DocumentChunk])-> bool:
         try: 
             points = []
             for embedding, chunk in zip(embeddings, document_chunks):
-                point_id = str(chunk.id)
-                payload = {
-                    "user_id": self.user_id,
-                    "document_id": chunk.document_id,
-                    "chunk_id": chunk.id,
-                    "chunk_index": chunk.index,
-                    "text": chunk.text,
-                }
                 points.append(
                     PointStruct(
-                        id = point_id,
-                        vector=embedding,
-                        payload=payload
+                        id=id(chunk.id),
+                        vector=list(embedding),
+                        payload={
+                            "user_id": self.user_id,
+                            "document_id": chunk.document_id,
+                            "chunkk_id": chunk.id,
+                            "chunk_index": chunk.index,
+                            "text": chunk.text
+                        }
                     )
                 )
             
-                self.qdrant_client.upsert(
-                    collection_name=COLLECTION,
-                    points=points
-                )
+            self.qdrant_client.upsert(
+                collection_name=COLLECTION,
+                points=points
+            )
             return True
         except Exception as e: 
             message = f"An error occured while uploading embeddings:\n{e}"

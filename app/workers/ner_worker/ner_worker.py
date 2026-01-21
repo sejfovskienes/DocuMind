@@ -52,7 +52,7 @@ class NERWorker:
 
     def delete_finished_tasks(self, db: Session) -> None: 
         self.ner_worker_print("[info]\tDeleting finished NER tasks...")
-        finished_ner_tasks = task_service.get_finished_ner_tasks(
+        finished_ner_tasks = task_service.get_finished_tasks(
             db, 
             worker_task_type.WorkerTaskType.ENTITY_EXTRACTION
         )

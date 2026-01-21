@@ -30,7 +30,7 @@ def get_task_by_id(
     return {
         "worker_task": WorkerTaskSchema.model_validate(worker_task)}
 
-@router.get("/summarization/{document_id}")
+@router.get("/summarize/{document_id}")
 def summarization_endpoint(
     document_id: int, 
     db: Session = Depends(get_database_session), 

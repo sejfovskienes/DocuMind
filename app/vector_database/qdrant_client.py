@@ -17,15 +17,22 @@ VECTOR_SIZE = 100
 class DocumindQdrantClient:
     def __init__(self, user_id: int):
         self.user_id = user_id
+
         self.qdrant_client = QdrantClient(
-        url=QDRANT_URL, 
-        api_key=QDRANT_API_KEY,
+            url=QDRANT_URL,
+            api_key=QDRANT_API_KEY
         )
-        if COLLECTION not in [c.name for c in self.qdrant_client.get_collections().collections]:
+
+        collections = self.qdrant_client.get_collections().collections
+        if COLLECTION not in [c.name for c in collections]:
             self.qdrant_client.create_collection(
                 collection_name=COLLECTION,
-                vectors_config=VectorParams(size=768, distance=Distance.COSINE)
+                vectors_config=VectorParams(
+                    size=768,
+                    distance=Distance.COSINE
+                )
             )
+        print(f"000000000000qdrant status check: {self.qdrant_client.get_collections()}")
     
     def __exit__(self, exc_type, exc_value, traceback):
         pass 

@@ -58,7 +58,7 @@ class SummarizationWorker:
         user_id = task_payload.get("user_id")
         document_id = task_payload.get("document_id")
         qdrant_client = DocumindQdrantClient(user_id=user_id)
-        result = qdrant_client.get_document_chunks(document_id=document_id)
+        result = qdrant_client.get_document_chunks(document_id=document_id) #--- returns list[str]
         if not result:
             self.summarization_worker_print("An error occured while fetching document chunks")
         print(f"Result of fetching document chunks: {result}")

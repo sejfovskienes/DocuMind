@@ -91,11 +91,7 @@ class DocumindQdrantClient:
         document_id: int,
         limit: int = 1000
     ) -> list[str]:
-        """
-        Fetch all text chunks for a given document and user.
-        """
-
-        chunks: list[str] = []
+        results = []
         offset = None
 
         scroll_filter = Filter(
@@ -122,9 +118,15 @@ class DocumindQdrantClient:
             )
 
             for point in points:
-                chunks.append(point.payload["text"])
+                results.append(
+                    (
+                        point.payload.get("chunk_index", 0),  # fallback 0 just in case
+                        point.payload.get("text", "")
+                    )
+                )
 
             if offset is None:
                 break
+        results.sort(key=lambda x: x[0])
 
-        return chunks
+        return [text for _, text in results]

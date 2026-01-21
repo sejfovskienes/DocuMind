@@ -2,7 +2,8 @@ import os
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import (
-    VectorParams, Distance, PointStruct
+    VectorParams, Distance, PointStruct, Filter, 
+    FieldCondition, MatchValue, PayloadSchemaType
 )
 
 from app.models.document_chunk import DocumentChunk
@@ -15,6 +16,23 @@ COLLECTION = os.getenv("QDRANT_COLLECTION_NAME")
 VECTOR_SIZE = 100
 
 class DocumindQdrantClient:
+    def _ensure_indexes(self):
+        indexes = {
+            "user_id": PayloadSchemaType.INTEGER,
+            "document_id": PayloadSchemaType.INTEGER,
+            "chunk_index": PayloadSchemaType.INTEGER,
+        }
+
+        for field, schema in indexes.items():
+            try:
+                self.qdrant_client.create_payload_index(
+                    collection_name=COLLECTION,
+                    field_name=field,
+                    field_schema=schema
+                )
+            except Exception:
+                pass
+
     def __init__(self, user_id: int):
         self.user_id = user_id
 
@@ -32,7 +50,7 @@ class DocumindQdrantClient:
                     distance=Distance.COSINE
                 )
             )
-        print(f"000000000000qdrant status check: {self.qdrant_client.get_collections()}")
+        self._ensure_indexes() 
     
     def __exit__(self, exc_type, exc_value, traceback):
         pass 
@@ -67,3 +85,46 @@ class DocumindQdrantClient:
             message = f"An error occured while uploading embeddings:\n{e}"
             print(message)
             return False 
+        
+    def get_document_chunks(
+        self,
+        document_id: int,
+        limit: int = 1000
+    ) -> list[str]:
+        """
+        Fetch all text chunks for a given document and user.
+        """
+
+        chunks: list[str] = []
+        offset = None
+
+        scroll_filter = Filter(
+            must=[
+                FieldCondition(
+                    key="user_id",
+                    match=MatchValue(value=self.user_id)
+                ),
+                FieldCondition(
+                    key="document_id",
+                    match=MatchValue(value=document_id)
+                )
+            ]
+        )
+
+        while True:
+            points, offset = self.qdrant_client.scroll(
+                collection_name=COLLECTION,
+                scroll_filter=scroll_filter,
+                limit=limit,
+                offset=offset,
+                with_payload=True,
+                with_vectors=False
+            )
+
+            for point in points:
+                chunks.append(point.payload["text"])
+
+            if offset is None:
+                break
+
+        return chunks

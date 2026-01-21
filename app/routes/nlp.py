@@ -36,7 +36,10 @@ def summarization_endpoint(
     db: Session = Depends(get_database_session), 
     current_user: User = Depends(get_current_user)) -> dict[str, Any]:
     summarization_task = WorkerTask(
-        payload={"document_id": document_id},
+        payload={
+                "document_id": document_id,
+                "user_id": current_user.id
+            },
         task_type=WorkerTaskType.SUMMARIZATION,
     )
     task_service.save_worker_task(db, summarization_task)

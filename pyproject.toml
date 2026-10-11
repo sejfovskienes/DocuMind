@@ -4,4 +4,43 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["fastapi (>=0.121.0,<0.122.0)", "psycopg2-binary (>=2.9.11,<3.0.0)", "python-jose[cryptography] (>=3.5.0,<4.0.0)", "dotenv (>=0.9.9,<0.10.0)", "python-dotenv (>=1.2.1,<2.0.0)"]
+dependencies = [
+    "fastapi (>=0.121.0,<0.122.0)",
+    "psycopg2-binary (>=2.9.11,<3.0.0)",
+    "python-jose[cryptography] (>=3.5.0,<4.0.0)",
+    "python-dotenv (>=1.2.1,<2.0.0)",
+    "sqlalchemy (>=2.0.44,<3.0.0)",
+    "pymupdf (>=1.26.6,<2.0.0)",
+    "sentence-transformers (>=5.1.2,<6.0.0)",
+    "transformers (>=4.57.1,<5.0.0)",
+    "onnxruntime (>=1.23.2,<2.0.0)",
+    "numpy (>=2.3.4,<3.0.0)",
+    "qdrant-client (>=1.15.1,<2.0.0)",
+    "passlib[argon2] (>=1.7.4,<2.0.0)",
+    "python-multipart (>=0.0.20,<0.1.0)",
+    "email-validator (>=2.3.0,<3.0.0)",
+    "uvicorn (>=0.38.0,<0.39.0)",
+    "art (>=6.5,<7.0)",
+]
+
+[dependency-groups]
+dev = ["ruff>=0.15,<0.16", "httpx>=0.28,<0.29"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+extend-exclude = [".tools", "app/notebooks", "app/core/onnx", "documents"]
+force-exclude = true
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP"]
+# Keep the existing enum string behavior used by API and worker contracts.
+ignore = ["UP042"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"

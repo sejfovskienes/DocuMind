@@ -17,3 +17,6 @@ documents/*
 
 # NER model
 app/core/onnx
+# Local validation tooling
+.tools/
+.ruff_cache/

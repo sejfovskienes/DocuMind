@@ -1,23 +1,36 @@
-from art import *  # noqa: F403
+"""FastAPI application entry point."""
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from art import tprint
 from fastapi import FastAPI
 
-from app.routes import auth, document, document_metadata, nlp
-from app.database import Base, engine
+from app.database_extension import initialize_database
+from app.routes import (
+    auth_router,
+    document_metadata_router,
+    document_router,
+    nlp_router,
+)
 
 
-app = FastAPI(title="DocuMind API")
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    tprint("DocuMind")
+    initialize_database()
+    yield
 
-@app.on_event("startup")
-async def startup_event():
-    tprint("DocuMind") # noqa
+
+app = FastAPI(title="DocuMind API", lifespan=lifespan)
+
 
 @app.get("/")
-def main():
+def main() -> dict[str, str]:
     return {"message": "connected to DocuMind API!"}
 
-Base.metadata.create_all(bind=engine)
 
-app.include_router(auth.router)
-app.include_router(document.router)
-app.include_router(document_metadata.router)
-app.include_router(nlp.router)
+app.include_router(auth_router.router)
+app.include_router(document_router.router)
+app.include_router(document_metadata_router.router)
+app.include_router(nlp_router.router)

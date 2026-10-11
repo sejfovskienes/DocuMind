@@ -6,7 +6,7 @@ These are recommendations for future changes, not claims about established repos
 
 - Keep HTTP parsing, authentication, and response shaping in `app/routes/`; keep database operations in `app/services/`; keep ORM definitions in `app/models/`; keep request/response validation in `app/schemas/`.
 - Pass dependencies such as a database session explicitly. Avoid loading models, opening database clients, or doing file I/O at import time where practical.
-- Keep worker orchestration separate from worker processing, following the existing processor module pattern, and make external clients/model dependencies explicit where practical.
+- Keep worker orchestration separate from processing. Put shared polling/text/storage helpers in `app/base/extensions`, settings in `app/base/config`, and inference adapters in `app/ml`. Make external clients/model dependencies explicit and lazy.
 
 ## Make behavior and types clear
 
@@ -40,4 +40,4 @@ These are recommendations for future changes, not claims about established repos
 
 ## Verification
 
-- This repository currently has no formatter, linter, or test configuration declared in `pyproject.toml`. For future changes, use available project checks when present and add focused tests for behavior changes when the task asks for verification or the risk warrants it. Never claim a check ran unless it did.
+- Ruff is configured in `pyproject.toml`, and focused unittest regressions live in `tests/`. Run `poetry run ruff check .`, `poetry run ruff format --check .`, and `poetry run python -m unittest discover -s tests` for relevant changes. Isolate external services and inference models; never claim a check ran unless it did.

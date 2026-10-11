@@ -1,20 +1,17 @@
-import os
-from art import * #noqa
+from pathlib import Path
+
+from app.base.config import ModelConfig
 
 from .ner_worker import NERWorker
 
-def get_model_path() -> os.path:
-    current_dir = os.path.dirname(__file__)
-    model_path = os.path.join(
-        current_dir, "..", "..", "core", "onnx", "xlm_roberta_ner.onnx")
-    model_path = os.path.abspath(model_path)
-    return model_path
-    
-def main() -> None:
-    model_path = get_model_path()
-    ner_worker = NERWorker(model_path)
-    ner_worker.ner_worker_loop()
 
-if "__name__==__main__":
-    tprint("NER Worker") #noqa
+def get_model_path() -> Path:
+    return Path(ModelConfig.ONNX_NER_MODEL_PATH)
+
+
+def main() -> None:
+    NERWorker(model_path=get_model_path()).ner_worker_loop()
+
+
+if __name__ == "__main__":
     main()

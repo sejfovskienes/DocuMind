@@ -1,141 +1,86 @@
-import sys
-import json
-import numpy as np
-from time import sleep
 from pathlib import Path
-import onnxruntime as ort
-from functools import wraps
-from datetime import datetime 
-from transformers import pipeline
+from typing import Any
+
 from sqlalchemy.orm import Session
-from transformers import (
-    AutoTokenizer, 
-    AutoModelForTokenClassification
-)
 
-from app.database import get_session
-from app.models.worker_task import WorkerTask
-from app.models.document_chunk import DocumentChunk
-from app.services import document_chunk_service, task_service
-from app.core.enum import worker_task_status, worker_task_type
+from app.base.config import WorkerConfig
+from app.base.extensions import run_worker_loop
+from app.core.enum import WorkerTaskType
+from app.database_extension import get_session
+from app.ml import ONNXNERModel, TransformersNERModel
+from app.models import DocumentChunk, WorkerTask
+from app.services import document_chunk_service, worker_task_service
+from app.workers.worker_task_runner import run_task
 
-def singleton(cls):
-    instances = {}
 
-    @wraps(cls)
-    def get_instance(*args, **kwargs):
-        if cls not in instances:
-            instances[cls] = cls(*args, **kwargs)
-            return instances[cls]
-    return get_instance
-
-@singleton
 class NERWorker:
-    def __init__(self, model_path: str | Path):
-        tokenizer = AutoTokenizer.from_pretrained("dslim/bert-base-NER")
-        model = AutoModelForTokenClassification.from_pretrained("dslim/bert-base-NER")
-
-        self.nlp = pipeline("ner", model=model, tokenizer=tokenizer)
-        self.model_session = ort.InferenceSession(model_path)
-        self.tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-base")
-        self.label_map = {0: "O", 1: "PER", 2: "ORG", 3: "LOC", 4: "MISC"} 
-    
-    def __enter__(self):
-        return self
-    
-    def __exit__(self, exc_type, exc_value, traceback):
-        del self.embedding_model
-        del self.tokenizer
+    def __init__(
+        self,
+        model_path: str | Path | None = None,
+        model: Any | None = None,
+        onnx_model: ONNXNERModel | None = None,
+    ):
+        self.model = model if model is not None else TransformersNERModel()
+        self.onnx_model = onnx_model or (
+            ONNXNERModel(model_path) if model_path is not None else None
+        )
 
     def ner_worker_print(self, text: str) -> None:
-        print("\033[93m {}\033[00m".format(text))
+        print(f"[NERWorker] {text}")
 
-    def delete_finished_tasks(self, db: Session) -> None: 
-        self.ner_worker_print("[info]\tDeleting finished NER tasks...")
-        finished_ner_tasks = task_service.get_finished_tasks(
-            db, 
-            worker_task_type.WorkerTaskType.ENTITY_EXTRACTION
+    def delete_finished_tasks(self, db: Session) -> None:
+        tasks = worker_task_service.get_finished_tasks(
+            db, WorkerTaskType.ENTITY_EXTRACTION
         )
-        if len(finished_ner_tasks) == 0:
-            self.ner_worker_print("Found 0 finished tasks.")
-            return
-        for task in finished_ner_tasks:
+        for task in tasks:
             db.delete(task)
-        db.commit()
-        message = f"Deleted {len(finished_ner_tasks)}, finished NER tasks."
-        self.ner_worker_print(message)
-    
-    def convert_text_to_tokens(self, chunk: DocumentChunk):
-        self.ner_worker_print("Converting to tokens...")
-        return self.tokenizer(chunk.text, return_tensors="np")
-    
-    def extract_named_entities(self, inputs):
-        self.ner_worker_print("Running model...")
-        outputs = self.model_session.run(None, {
-            "input_ids": inputs["input_ids"], 
-            "attention_mask": inputs["attention_mask"]})
-        logits = outputs[0]
-        pred_ids = np.argmax(logits, axis=-1)[0]
-        return pred_ids
-    
-    def convert_ids_to_tokens(self, pred_ids, inputs):
-        return self.tokenizer.convert_ids_to_tokens(inputs["input_ids"][0])
-    
-    def extract_entities(self, chunk: DocumentChunk) -> dict[str, any]:
-        processing_text = chunk.text
-        result = self.nlp(processing_text)
-        return result
+        if tasks:
+            db.commit()
 
-    def ner_processing(self, 
-                       db: Session, 
-                       ner_task: WorkerTask) -> None:
+    def convert_text_to_tokens(self, chunk: DocumentChunk) -> dict[str, Any]:
+        if self.onnx_model is None:
+            raise RuntimeError("ONNX model path was not configured")
+        return self.onnx_model.tokenize(chunk.text)
+
+    def extract_named_entities(self, inputs: dict[str, Any]) -> Any:
+        if self.onnx_model is None:
+            raise RuntimeError("ONNX model path was not configured")
+        return self.onnx_model.infer(inputs)
+
+    def convert_ids_to_tokens(self, pred_ids: Any, inputs: dict[str, Any]) -> Any:
+        if self.onnx_model is None:
+            raise RuntimeError("ONNX model path was not configured")
+        return self.onnx_model.tokens(inputs)
+
+    def extract_entities(self, chunk: DocumentChunk) -> list[dict[str, Any]]:
+        return self.model.extract(chunk.text)
+
+    def ner_processing(self, db: Session, ner_task: WorkerTask) -> None:
         document_id = int(ner_task.payload["document_id"])
-        document_chunks = document_chunk_service.get_chunks_by_document_id(db, document_id)
-        entities = []
-        for chunk in document_chunks:
+        chunks = document_chunk_service.get_chunks_by_document_id(db, document_id)
+        if not chunks:
+            raise ValueError(f"No chunks found for document {document_id}")
+        for chunk in chunks:
             entities = self.extract_entities(chunk)
-            print(f"ENTITIES FROM CHUNK WITH ID: {chunk.id}:\n{entities}\n")
             document_chunk_service.update_document_chunk(
-                db, 
-                chunk, 
-                {"ner_entities": json.dumps(str(entities))})
-        
+                db, chunk, {"ner_entities": entities}
+            )
+
+    def _process_task(self, db: Session, task: WorkerTask) -> bool:
+        completed = run_task(db, task, lambda: self.ner_processing(db, task))
+        if not completed:
+            self.ner_worker_print(f"Entity extraction task {task.id} failed")
+        return completed
+
     def ner_worker_loop(self) -> None:
-        db = get_session()
-        self.ner_worker_print("NER worker started...")
-        self.delete_finished_tasks(db)
-        self.ner_worker_print("Waiting for tasks...")
-        try: 
-            while True:
-                ner_task = task_service.get_new_task(
-                    db, 
-                    task_type=worker_task_type.WorkerTaskType.ENTITY_EXTRACTION)
-                if not ner_task:
-                    db.close()
-                    self.ner_worker_print("No tasks, worker going to sleep mode...")
-                    sleep(1)
-                    continue
-                try:
-                    task_service.update_worker_task(
-                        db, 
-                        ner_task, 
-                        {"status": worker_task_status.WorkerTaskStatus.PROCESSING})
-                    self.ner_processing(db, ner_task)
-                except Exception as e:
-                    task_service.update_worker_task(
-                        db, 
-                        ner_task, 
-                        {"status": worker_task_status.WorkerTaskStatus.FAILED})
-                    self.ner_worker_print(
-                        f"An error occured while processing task with id:{id}, error message:{e}")
-                finally:
-                    task_service.update_worker_task(
-                        db,
-                        ner_task,
-                        {"status": worker_task_status.WorkerTaskStatus.FINISHED, 
-                         "finshed_at": datetime.utcnow()}
-                    )
-        except KeyboardInterrupt:
-            self.ner_worker_print("Worker stopped.\n\n")
-            self.ner_worker_print("="*55)
-            sys.exit(0)
+        self.ner_worker_print("NER worker started")
+        run_worker_loop(
+            create_session=get_session,
+            fetch_task=lambda db: worker_task_service.get_new_task(
+                db, WorkerTaskType.ENTITY_EXTRACTION
+            ),
+            process_task=self._process_task,
+            cleanup_finished=self.delete_finished_tasks,
+            interval_seconds=WorkerConfig.NER_POLL_INTERVAL_SECONDS,
+            log=self.ner_worker_print,
+        )

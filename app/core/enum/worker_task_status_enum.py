@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class WorkerTaskStatus(str, Enum):
     QUEUED = "QUEUED"
     PROCESSING = "PROCESSING"

@@ -1,13 +1,15 @@
-from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+
 
 class DocumentChunkSchema(BaseModel):
-    id: int 
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
     document_id: int
-    metadata_id: int
-    index: int 
+    metadata_id: int | None = None
+    index: int
     text: str
     tokens: int
-    embeddings: List[float]
-
-    model_config = {"from_attributes": True}
+    embeddings: list[float] | None = None
+    ner_entities: list[object] | dict[str, object] | str | None = None
+    topic_keywords: list[object] | dict[str, object] | None = None

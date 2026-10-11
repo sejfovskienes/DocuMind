@@ -1,8 +1,10 @@
-from datetime import datetime
-from sqlalchemy.orm import relationship
-from sqlalchemy import Column, Integer, ForeignKey, JSON, DateTime, Text
+from datetime import UTC, datetime
 
-from app.database import Base
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, Text
+from sqlalchemy.orm import relationship
+
+from app.database_extension import Base
+
 
 class DocumentMetadata(Base):
     __tablename__ = "document_metadata"
@@ -15,10 +17,9 @@ class DocumentMetadata(Base):
     global_entities = Column(JSON, nullable=True)
     global_topics = Column(JSON, nullable=True)
     last_updated = Column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    document = relationship(
-        "Document", 
-        back_populates="processed_document_metadata"
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
     )
-    
+
+    document = relationship("Document", back_populates="processed_document_metadata")
